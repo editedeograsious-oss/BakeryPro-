@@ -6,9 +6,9 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY DS-Bakery-Master-v0.36.zip /tmp/ds-bakery.zip
+COPY DS-Bakery-Master-v0.37.zip /tmp/ds-bakery.zip
 RUN unzip -q /tmp/ds-bakery.zip -d /app \
-  && mv /app/DS-Bakery-Master-v0.36 /app/site \
+  && mv /app/DS-Bakery-Master-v0.37 /app/site \
   && rm /tmp/ds-bakery.zip
 
 WORKDIR /app/site
