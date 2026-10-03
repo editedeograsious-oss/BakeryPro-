@@ -13,8 +13,10 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
 
 WORKDIR /app/site
 
-# v0.35 staging build fix: make menu category keys explicitly string typed.
+# Staging build fixes for strict TypeScript checks.
 RUN node -e "const fs=require('fs'); const p='app/page.tsx'; let s=fs.readFileSync(p,'utf8'); const old='const categories=[...new Set(catalog.map((p:any)=>p.category_name||\"Bakery Menu\"))];'; const neu='const categories:string[]=Array.from(new Set<string>((catalog as any[]).map((p:any)=>String(p.category_name||\"Bakery Menu\"))));'; if(!s.includes(old)) throw new Error('Expected category line not found'); fs.writeFileSync(p,s.replace(old,neu));"
+
+RUN node -e "const fs=require('fs'); const p='lib/supabase/server.ts'; let s=fs.readFileSync(p,'utf8'); const old='setAll(cookiesToSet) {'; const neu='setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {'; if(!s.includes(old)) throw new Error('Expected setAll signature not found'); fs.writeFileSync(p,s.replace(old,neu));"
 
 RUN npm install
 RUN npm run build
