@@ -13,6 +13,9 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
 
 WORKDIR /app/site
 
+# v0.35 staging build fix: make menu category keys explicitly string typed.
+RUN sed -i 's|const categories=\[\.\.\.new Set(catalog.map((p:any)=>p.category_name||"Bakery Menu"))\];|const categories:string[]=Array.from(new Set<string>((catalog as any[]).map((p:any)=>String(p.category_name||"Bakery Menu"))));|' app/page.tsx
+
 RUN npm install
 RUN npm run build
 RUN npm prune --omit=dev
