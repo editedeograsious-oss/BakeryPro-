@@ -13,6 +13,18 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
 
 WORKDIR /app/site
 
+# NEXT_PUBLIC values are intentionally browser-visible and must exist during next build.
+# These are staging-only public client settings; no service-role or database secret is included.
+ARG NEXT_PUBLIC_SUPABASE_URL=https://kymadepeuqhcsjwbrgqq.supabase.co
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_EqTViHCuhpqCvWxCHN8FGQ_lDcXrY6O
+ARG NEXT_PUBLIC_DEPLOYMENT_ENV=staging
+ARG NEXT_PUBLIC_DEMO_MODE=false
+
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_DEPLOYMENT_ENV=$NEXT_PUBLIC_DEPLOYMENT_ENV
+ENV NEXT_PUBLIC_DEMO_MODE=$NEXT_PUBLIC_DEMO_MODE
+
 # Staging build fixes for strict TypeScript checks.
 RUN node -e "const fs=require('fs'); const p='app/page.tsx'; let s=fs.readFileSync(p,'utf8'); const old='const categories=[...new Set(catalog.map((p:any)=>p.category_name||\"Bakery Menu\"))];'; const neu='const categories:string[]=Array.from(new Set<string>((catalog as any[]).map((p:any)=>String(p.category_name||\"Bakery Menu\"))));'; if(!s.includes(old)) throw new Error('Expected category line not found'); fs.writeFileSync(p,s.replace(old,neu));"
 
