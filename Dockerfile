@@ -20,8 +20,10 @@ RUN node -e "const fs=require('fs'); const p='lib/supabase/server.ts'; let s=fs.
 
 RUN node -e "const fs=require('fs'); const p='middleware.ts'; let s=fs.readFileSync(p,'utf8'); const old='setAll(cookiesToSet) {'; const neu='setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {'; if(!s.includes(old)) throw new Error('Expected middleware setAll signature not found'); fs.writeFileSync(p,s.replace(old,neu));"
 
+RUN node -e "const fs=require('fs'); const p='package.json'; const j=JSON.parse(fs.readFileSync(p,'utf8')); j.overrides={...(j.overrides||{}),postcss:'8.5.28'}; fs.writeFileSync(p,JSON.stringify(j,null,2)+'\\n');"
+
 RUN npm install
-RUN npm audit --json || true
+RUN npm audit --audit-level=moderate
 RUN npm run build
 RUN npm prune --omit=dev
 
