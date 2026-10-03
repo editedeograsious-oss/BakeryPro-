@@ -34,6 +34,9 @@ RUN node -e "const fs=require('fs'); const p='middleware.ts'; let s=fs.readFileS
 
 RUN node -e "const fs=require('fs'); const p='package.json'; const j=JSON.parse(fs.readFileSync(p,'utf8')); j.overrides={...(j.overrides||{}),postcss:'8.5.28'}; fs.writeFileSync(p,JSON.stringify(j,null,2)+'\\n');"
 
+COPY staging-patches/dashboard-page.tsx /app/site/app/dashboard/page.tsx
+COPY staging-patches/system-status-page.tsx /app/site/app/system-status/page.tsx
+
 RUN npm install
 RUN npm audit --audit-level=moderate
 RUN npm run build
