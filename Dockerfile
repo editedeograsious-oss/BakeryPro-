@@ -18,6 +18,8 @@ RUN node -e "const fs=require('fs'); const p='app/page.tsx'; let s=fs.readFileSy
 
 RUN node -e "const fs=require('fs'); const p='lib/supabase/server.ts'; let s=fs.readFileSync(p,'utf8'); const old='setAll(cookiesToSet) {'; const neu='setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {'; if(!s.includes(old)) throw new Error('Expected setAll signature not found'); fs.writeFileSync(p,s.replace(old,neu));"
 
+RUN node -e "const fs=require('fs'); const p='middleware.ts'; let s=fs.readFileSync(p,'utf8'); const old='setAll(cookiesToSet) {'; const neu='setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {'; if(!s.includes(old)) throw new Error('Expected middleware setAll signature not found'); fs.writeFileSync(p,s.replace(old,neu));"
+
 RUN npm install
 RUN npm run build
 RUN npm prune --omit=dev
