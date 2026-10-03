@@ -14,7 +14,7 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
 WORKDIR /app/site
 
 # v0.35 staging build fix: make menu category keys explicitly string typed.
-RUN sed -i 's|const categories=\[\.\.\.new Set(catalog.map((p:any)=>p.category_name||"Bakery Menu"))\];|const categories:string[]=Array.from(new Set<string>((catalog as any[]).map((p:any)=>String(p.category_name||"Bakery Menu"))));|' app/page.tsx
+RUN node -e "const fs=require('fs'); const p='app/page.tsx'; let s=fs.readFileSync(p,'utf8'); const old='const categories=[...new Set(catalog.map((p:any)=>p.category_name||\"Bakery Menu\"))];'; const neu='const categories:string[]=Array.from(new Set<string>((catalog as any[]).map((p:any)=>String(p.category_name||\"Bakery Menu\"))));'; if(!s.includes(old)) throw new Error('Expected category line not found'); fs.writeFileSync(p,s.replace(old,neu));"
 
 RUN npm install
 RUN npm run build
