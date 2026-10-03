@@ -6,15 +6,15 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY DS-Bakery-Master-v0.35.zip /tmp/ds-bakery.zip
+COPY DS-Bakery-Master-v0.36.zip /tmp/ds-bakery.zip
 RUN unzip -q /tmp/ds-bakery.zip -d /app \
-  && mv /app/DS-Bakery-Master-v0.35 /app/site \
+  && mv /app/DS-Bakery-Master-v0.36 /app/site \
   && rm /tmp/ds-bakery.zip
 
 WORKDIR /app/site
 
-# NEXT_PUBLIC values are intentionally browser-visible and must exist during next build.
-# These are staging-only public client settings; no service-role or database secret is included.
+# Staging-only public browser configuration.
+# No service-role key or database password is embedded here.
 ARG NEXT_PUBLIC_SUPABASE_URL=https://kymadepeuqhcsjwbrgqq.supabase.co
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_EqTViHCuhpqCvWxCHN8FGQ_lDcXrY6O
 ARG NEXT_PUBLIC_DEPLOYMENT_ENV=staging
@@ -24,19 +24,6 @@ ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
 ENV NEXT_PUBLIC_DEPLOYMENT_ENV=$NEXT_PUBLIC_DEPLOYMENT_ENV
 ENV NEXT_PUBLIC_DEMO_MODE=$NEXT_PUBLIC_DEMO_MODE
-
-# Staging build fixes for strict TypeScript checks.
-RUN node -e "const fs=require('fs'); const p='app/page.tsx'; let s=fs.readFileSync(p,'utf8'); const old='const categories=[...new Set(catalog.map((p:any)=>p.category_name||\"Bakery Menu\"))];'; const neu='const categories:string[]=Array.from(new Set<string>((catalog as any[]).map((p:any)=>String(p.category_name||\"Bakery Menu\"))));'; if(!s.includes(old)) throw new Error('Expected category line not found'); fs.writeFileSync(p,s.replace(old,neu));"
-
-RUN node -e "const fs=require('fs'); const p='lib/supabase/server.ts'; let s=fs.readFileSync(p,'utf8'); const old='setAll(cookiesToSet) {'; const neu='setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {'; if(!s.includes(old)) throw new Error('Expected setAll signature not found'); fs.writeFileSync(p,s.replace(old,neu));"
-
-RUN node -e "const fs=require('fs'); const p='middleware.ts'; let s=fs.readFileSync(p,'utf8'); const old='setAll(cookiesToSet) {'; const neu='setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {'; if(!s.includes(old)) throw new Error('Expected middleware setAll signature not found'); fs.writeFileSync(p,s.replace(old,neu));"
-
-RUN node -e "const fs=require('fs'); const p='package.json'; const j=JSON.parse(fs.readFileSync(p,'utf8')); j.overrides={...(j.overrides||{}),postcss:'8.5.28'}; fs.writeFileSync(p,JSON.stringify(j,null,2)+'\\n');"
-
-COPY staging-patches/Sidebar.tsx /app/site/components/Sidebar.tsx
-COPY staging-patches/dashboard-page.tsx /app/site/app/dashboard/page.tsx
-COPY staging-patches/system-status-page.tsx /app/site/app/system-status/page.tsx
 
 RUN npm install
 RUN npm audit --audit-level=moderate
