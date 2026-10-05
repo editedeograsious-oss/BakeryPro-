@@ -14,7 +14,9 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && cat /tmp/staging-v038/part-*.b64 | tr -d '\n\r' | base64 -d > /tmp/v038-patch.zip \
   && test "$(sha256sum /tmp/v038-patch.zip | awk '{print $1}')" = "7571746afe8691782e113ceebaa02f9292da9e8a75cfa26106bffdcce137016a" \
   && unzip -qo /tmp/v038-patch.zip -d /app/site \
+  && mkdir -p /app/site/app/api/staff/create \
   && cp /tmp/production-fixes/staff-invite-route.ts /app/site/app/api/staff/invite/route.ts \
+  && cp /tmp/production-fixes/staff-create-route.ts /app/site/app/api/staff/create/route.ts \
   && cp /tmp/production-fixes/StaffAdminManager.tsx /app/site/components/admin/StaffAdminManager.tsx \
   && find /app/site/app /app/site/components -type f -name '*.tsx' -exec sed -i 's#/ds-bakery-logo.svg#/ds-bakery-logo.png#g' {} + \
   && cp /app/site/public/ds-bakery-logo.png /app/site/app/icon.png \
