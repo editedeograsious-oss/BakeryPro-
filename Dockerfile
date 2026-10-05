@@ -14,10 +14,9 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && cat /tmp/staging-v038/part-*.b64 | tr -d '\n\r' | base64 -d > /tmp/v038-patch.zip \
   && test "$(sha256sum /tmp/v038-patch.zip | awk '{print $1}')" = "7571746afe8691782e113ceebaa02f9292da9e8a75cfa26106bffdcce137016a" \
   && unzip -qo /tmp/v038-patch.zip -d /app/site \
-  && cat /tmp/production-fixes/invite-edge-fix.b64 | tr -d '\n\r' | base64 -d > /tmp/invite-edge-fix.zip \
-  && test "$(sha256sum /tmp/invite-edge-fix.zip | awk '{print $1}')" = "2c258850c194a19532d6c8debcd18fcfd173775bbaab8ed2ce53b45200441a43" \
-  && unzip -qo /tmp/invite-edge-fix.zip -d /app/site \
-  && rm -rf /tmp/ds-bakery.zip /tmp/v038-patch.zip /tmp/invite-edge-fix.zip /tmp/staging-v038 /tmp/production-fixes
+  && cp /tmp/production-fixes/staff-invite-route.ts /app/site/app/api/staff/invite/route.ts \
+  && sed -i 's#Live invitations require the server-only SUPABASE_SERVICE_ROLE_KEY. It is never sent to the browser.#Invitations are processed securely by DS Bakery through Supabase Auth. Privileged credentials are never sent to the browser.#' /app/site/components/admin/StaffAdminManager.tsx \
+  && rm -rf /tmp/ds-bakery.zip /tmp/v038-patch.zip /tmp/staging-v038 /tmp/production-fixes
 
 WORKDIR /app/site
 
