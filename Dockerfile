@@ -33,6 +33,8 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && cp /tmp/production-fixes/CustomerOrderManager.tsx /app/site/components/service/CustomerOrderManager.tsx \
   && cp /tmp/production-fixes/CreditBookManager.tsx /app/site/components/finance/CreditBookManager.tsx \
   && cp /tmp/production-fixes/CreditPaymentCorrections.tsx /app/site/components/finance/CreditPaymentCorrections.tsx \
+  && cp /tmp/production-fixes/PayrollManager.tsx /app/site/components/finance/PayrollManager.tsx \
+  && cp /tmp/production-fixes/payroll-page.tsx /app/site/app/payroll/page.tsx \
   && cp /tmp/production-fixes/ExpenseManager.tsx /app/site/components/operations/ExpenseManager.tsx \
   && cp /tmp/production-fixes/expenses-page.tsx /app/site/app/expenses/page.tsx \
   && cp /tmp/production-fixes/supplier-accounts-page.tsx /app/site/app/supplier-accounts/page.tsx \
