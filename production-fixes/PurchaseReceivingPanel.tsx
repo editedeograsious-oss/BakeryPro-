@@ -1,20 +1,23 @@
 'use client';
 
-import { useRef, useState } from "react";
+import { useMemo,useRef,useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ugx } from "@/lib/costing";
 
-export default function PurchaseReceivingPanel({lines,history,live}:{lines:any[];history:any[];live:boolean}){
+export default function PurchaseReceivingPanel({lines,live}:{lines:any[];live:boolean}){
   const router=useRouter();
   const [quantities,setQuantities]=useState<Record<string,number>>({});
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
   const requests=useRef<Record<string,string>>({});
 
-  const fullyReceived=history.filter((x:any)=>Number(x.remaining_qty_base||0)<=0).length;
-  const historyValue=history.reduce((s:number,x:any)=>s+Number(x.line_total||0),0);
-  const receivedValue=history.reduce((s:number,x:any)=>s+Number(x.received_qty_base||0)*Number(x.unit_cost_base||0),0);
+  const openLines=lines.filter(l=>Number(l.remaining_qty_base||0)>0);
+  const completedLines=lines.filter(l=>Number(l.remaining_qty_base||0)<=0);
+  const ordered=useMemo(()=>lines.reduce((s,l)=>s+Number(l.ordered_qty_base||0),0),[lines]);
+  const received=useMemo(()=>lines.reduce((s,l)=>s+Number(l.received_qty_base||0),0),[lines]);
+  const remaining=useMemo(()=>lines.reduce((s,l)=>s+Number(l.remaining_qty_base||0),0),[lines]);
+  const value=useMemo(()=>lines.reduce((s,l)=>s+Number(l.line_total||0),0),[lines]);
 
   async function receive(line:any){
     const qty=Number(quantities[line.id]??0);
@@ -24,7 +27,6 @@ export default function PurchaseReceivingPanel({lines,history,live}:{lines:any[]
 
     const requestId=requests.current[line.id]??crypto.randomUUID();
     requests.current[line.id]=requestId;
-
     setBusy(true);setMessage("");
     try{
       const supabase=createClient();
@@ -34,7 +36,7 @@ export default function PurchaseReceivingPanel({lines,history,live}:{lines:any[]
         p_client_request_id:requestId,
       });
       if(error)throw error;
-      setMessage(`Stock receipt posted • ${data}`);
+      setMessage(`Stock receipt posted: ${data}`);
       delete requests.current[line.id];
       setQuantities(prev=>({...prev,[line.id]:0}));
       router.refresh();
@@ -42,48 +44,46 @@ export default function PurchaseReceivingPanel({lines,history,live}:{lines:any[]
     finally{setBusy(false);}
   }
 
+  function rows(items:any[],allowReceive:boolean){
+    return <div className="tablewrap"><table>
+      <thead><tr><th>PO</th><th>Supplier</th><th>Material</th><th>Ordered</th><th>Received</th><th>Remaining</th><th>Unit Cost</th><th>Line Value</th>{allowReceive&&<th>Receive</th>}</tr></thead>
+      <tbody>{items.length===0?<tr><td colSpan={allowReceive?9:8}>{allowReceive?"No approved purchase lines awaiting receipt.":"No completed receiving history yet."}</td></tr>:items.map(l=><tr key={l.id}>
+        <td><b>{l.purchase_no}</b><br/><span style={{fontSize:12,color:"var(--muted)"}}>{l.purchase_date}</span></td>
+        <td>{l.supplier_name}</td>
+        <td>{l.material_name}</td>
+        <td>{Number(l.ordered_qty_base).toLocaleString()} {l.base_unit}</td>
+        <td><b>{Number(l.received_qty_base).toLocaleString()} {l.base_unit}</b></td>
+        <td>{Number(l.remaining_qty_base)>0?<span className="badge gold">{Number(l.remaining_qty_base).toLocaleString()} {l.base_unit}</span>:<span className="badge green">Complete</span>}</td>
+        <td>{ugx(Number(l.unit_cost_base))}/{l.base_unit}</td>
+        <td>{ugx(Number(l.line_total||0))}</td>
+        {allowReceive&&<td><div style={{display:"flex",gap:6,minWidth:190}}><input type="number" min="0.000001" step="any" style={{maxWidth:105}} value={quantities[l.id]??0} onChange={e=>setQuantities(prev=>({...prev,[l.id]:Number(e.target.value)}))}/><button className="btn primary" disabled={busy} onClick={()=>receive(l)}>Receive</button></div></td>}
+      </tr>)}</tbody>
+    </table></div>;
+  }
+
   return <>
-    <div className="pagehead"><div><h1>Purchases & Receiving</h1><p>Receive approved supplier orders and keep completed receipt history visible.</p></div></div>
+    <div className="pagehead"><div><h1>Purchase Receiving</h1><p>Receive approved supplier deliveries and keep completed receipts visible for audit.</p></div></div>
     {message&&<div className="hero" style={{padding:14}}><b>{message}</b></div>}
 
     <div className="grid4">
-      <div className="card stat"><div className="label">Open Receipt Lines</div><div className="value">{lines.length}</div></div>
-      <div className="card stat"><div className="label">Fully Received Lines</div><div className="value">{fullyReceived}</div></div>
-      <div className="card stat"><div className="label">Purchase Line Value</div><div className="value">{ugx(historyValue)}</div></div>
-      <div className="card stat"><div className="label">Value Received</div><div className="value">{ugx(receivedValue)}</div></div>
+      <div className="card stat"><div className="label">Ordered Qty</div><div className="value">{ordered.toLocaleString()}</div></div>
+      <div className="card stat"><div className="label">Received Qty</div><div className="value">{received.toLocaleString()}</div></div>
+      <div className="card stat"><div className="label">Remaining Qty</div><div className="value">{remaining.toLocaleString()}</div></div>
+      <div className="card stat"><div className="label">Purchase Line Value</div><div className="value">{ugx(value)}</div></div>
     </div>
 
     <div className="card" style={{marginTop:16}}>
       <h2 style={{color:"var(--brown)",marginTop:0}}>Awaiting Receipt</h2>
-      <p style={{color:"var(--muted)"}}>Only approved purchase-order lines with quantity still outstanding appear here.</p>
-      <div className="tablewrap"><table><thead><tr><th>PO</th><th>Supplier</th><th>Material</th><th>Ordered</th><th>Received</th><th>Remaining</th><th>Unit Cost</th><th>Receive</th></tr></thead>
-        <tbody>{lines.length===0?<tr><td colSpan={8}>No approved purchase lines are waiting for receipt.</td></tr>:lines.map(l=><tr key={l.id}>
-          <td><b>{l.purchase_no}</b></td><td>{l.supplier_name}</td><td>{l.material_name}</td>
-          <td>{Number(l.ordered_qty_base).toLocaleString()} {l.base_unit}</td>
-          <td>{Number(l.received_qty_base).toLocaleString()} {l.base_unit}</td>
-          <td><b>{Number(l.remaining_qty_base).toLocaleString()} {l.base_unit}</b></td>
-          <td>{ugx(Number(l.unit_cost_base))}/{l.base_unit}</td>
-          <td><div style={{display:"flex",gap:6,minWidth:190}}><input type="number" min="0.000001" step="any" style={{maxWidth:105}} value={quantities[l.id]??0} onChange={e=>setQuantities(prev=>({...prev,[l.id]:Number(e.target.value)}))}/><button className="btn primary" disabled={busy} onClick={()=>receive(l)}>Receive</button></div></td>
-        </tr>)}</tbody>
-      </table></div>
+      <p style={{color:"var(--muted)"}}>Only approved purchase-order lines can increase raw-material stock.</p>
+      {rows(openLines,true)}
     </div>
 
     <div className="card" style={{marginTop:16}}>
-      <h2 style={{color:"var(--brown)",marginTop:0}}>Receiving History</h2>
-      <p style={{color:"var(--muted)"}}>Completed purchase lines stay visible here after they leave the receiving queue.</p>
-      <div className="tablewrap"><table>
-        <thead><tr><th>PO</th><th>Date</th><th>Supplier</th><th>Material</th><th>Ordered</th><th>Received</th><th>Remaining</th><th>Line Value</th><th>Status</th></tr></thead>
-        <tbody>{history.length===0?<tr><td colSpan={9}>No purchase receiving history found.</td></tr>:history.map((l:any)=><tr key={l.id}>
-          <td><b>{l.purchase_no}</b></td><td>{l.purchase_date}</td><td>{l.supplier_name}</td><td>{l.material_name}</td>
-          <td>{Number(l.ordered_qty_base||0).toLocaleString()} {l.base_unit}</td>
-          <td><b>{Number(l.received_qty_base||0).toLocaleString()} {l.base_unit}</b></td>
-          <td>{Number(l.remaining_qty_base||0).toLocaleString()} {l.base_unit}</td>
-          <td>{ugx(Number(l.line_total||0))}</td>
-          <td>{Number(l.remaining_qty_base||0)<=0?<span className="badge green">RECEIVED</span>:<span className="badge gold">PARTIAL / OPEN</span>}</td>
-        </tr>)}</tbody>
-      </table></div>
+      <h2 style={{color:"var(--brown)",marginTop:0}}>Receipt History</h2>
+      <p style={{color:"var(--muted)"}}>Fully received lines stay visible here instead of disappearing from the page.</p>
+      {rows(completedLines,false)}
     </div>
 
-    <div className="hero" style={{marginTop:16}}><h2>Receiving protects stock accuracy</h2><p>Approval alone does not increase inventory. Stock changes only when an approved receipt is posted, and completed receipts remain visible in the history table.</p></div>
+    <div className="hero" style={{marginTop:16}}><h2>Receiving is protected</h2><p>Each receiving request carries a unique client request ID so a retry cannot silently post the same delivery twice.</p></div>
   </>;
 }
