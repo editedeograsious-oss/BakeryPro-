@@ -46,6 +46,7 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && cp /tmp/production-fixes/DailyClosingPanel.tsx /app/site/components/core/DailyClosingPanel.tsx \
   && cp /tmp/production-fixes/LiveManagementReport.tsx /app/site/components/reports/LiveManagementReport.tsx \
   && cp /tmp/production-fixes/purchases-page.tsx /app/site/app/purchases/page.tsx \
+  && cp /tmp/production-fixes/purchase-orders-page.tsx /app/site/app/purchase-orders/page.tsx \
   && find /app/site/app /app/site/components -type f -name '*.tsx' -exec sed -i 's#/ds-bakery-logo.svg#/ds-bakery-logo.png#g' {} + \
   && cp /app/site/public/ds-bakery-logo.png /app/site/app/icon.png \
   && cp /app/site/public/ds-bakery-logo.png /app/site/app/apple-icon.png \
