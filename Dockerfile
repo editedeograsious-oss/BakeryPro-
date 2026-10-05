@@ -30,6 +30,8 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && cp /tmp/production-fixes/RuntimeBanner.tsx /app/site/components/RuntimeBanner.tsx \
   && cp /tmp/production-fixes/login-page.tsx /app/site/app/login/page.tsx \
   && cp /tmp/production-fixes/CustomerOrderPaymentCorrections.tsx /app/site/components/finance/CustomerOrderPaymentCorrections.tsx \
+  && cp /tmp/production-fixes/CustomerOrderManager.tsx /app/site/components/service/CustomerOrderManager.tsx \
+  && cp /tmp/production-fixes/CreditBookManager.tsx /app/site/components/finance/CreditBookManager.tsx \
   && cp /tmp/production-fixes/CreditPaymentCorrections.tsx /app/site/components/finance/CreditPaymentCorrections.tsx \
   && cp /tmp/production-fixes/ExpenseManager.tsx /app/site/components/operations/ExpenseManager.tsx \
   && cp /tmp/production-fixes/expenses-page.tsx /app/site/app/expenses/page.tsx \
