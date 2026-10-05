@@ -15,7 +15,7 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && test "$(sha256sum /tmp/v038-patch.zip | awk '{print $1}')" = "7571746afe8691782e113ceebaa02f9292da9e8a75cfa26106bffdcce137016a" \
   && unzip -qo /tmp/v038-patch.zip -d /app/site \
   && cp /tmp/production-fixes/staff-invite-route.ts /app/site/app/api/staff/invite/route.ts \
-  && sed -i 's#Live invitations require the server-only SUPABASE_SERVICE_ROLE_KEY. It is never sent to the browser.#Invitations are processed securely by DS Bakery through Supabase Auth. Privileged credentials are never sent to the browser.#' /app/site/components/admin/StaffAdminManager.tsx \
+  && cp /tmp/production-fixes/StaffAdminManager.tsx /app/site/components/admin/StaffAdminManager.tsx \
   && find /app/site/app /app/site/components -type f -name '*.tsx' -exec sed -i 's#/ds-bakery-logo.svg#/ds-bakery-logo.png#g' {} + \
   && cp /app/site/public/ds-bakery-logo.png /app/site/app/icon.png \
   && cp /app/site/public/ds-bakery-logo.png /app/site/app/apple-icon.png \
