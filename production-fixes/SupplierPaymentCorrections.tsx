@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ugx } from "@/lib/costing";
 
-export default function SupplierPaymentCorrections({live,canCorrect}:{live:boolean;canCorrect:boolean}){
+export default function SupplierPaymentCorrections({live,canCorrect,refreshKey}:{live:boolean;canCorrect:boolean;refreshKey?:string}){
   const router=useRouter();
   const [rows,setRows]=useState<any[]>([]);
   const [message,setMessage]=useState("");
@@ -22,7 +22,7 @@ export default function SupplierPaymentCorrections({live,canCorrect}:{live:boole
     if(error){setMessage(error.message);return;}
     setRows(data??[]);
   }
-  useEffect(()=>{void load();},[live]);
+  useEffect(()=>{void load();},[live,refreshKey]);
 
   async function edit(row:any){
     if(!canCorrect){setMessage("You do not have correction permission.");return;}

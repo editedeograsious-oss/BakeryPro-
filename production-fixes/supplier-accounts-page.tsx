@@ -19,6 +19,6 @@ export default async function SupplierAccounts(){
 
   return <div className="shell"><Sidebar/><main className="main">
     <SupplierAccountsPanel accounts={data.accounts} statements={data.statements} payables={data.payables} shifts={data.shifts} live={!data.demo}/>
-    <SupplierPaymentCorrections live={!data.demo} canCorrect={canCorrect}/>
+    <SupplierPaymentCorrections live={!data.demo} canCorrect={canCorrect} refreshKey={data.statements.map((row:any)=>`${row.source_id}:${row.credit}:${row.edited_at??""}:${row.voided_at??""}`).join("|")}/>
   </main></div>;
 }
