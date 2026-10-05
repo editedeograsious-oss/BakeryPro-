@@ -35,15 +35,9 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && cp /tmp/production-fixes/WasteCorrections.tsx /app/site/components/finance/WasteCorrections.tsx \
   && cp /tmp/production-fixes/stock-movements-page.tsx /app/site/app/stock-movements/page.tsx \
   && cp /tmp/production-fixes/waste-page.tsx /app/site/app/waste/page.tsx \
-  && cp /tmp/production-fixes/business38.ts /app/site/lib/repositories/business38.ts \
-  && cp /tmp/production-fixes/FinanceControlPanel.tsx /app/site/components/finance/FinanceControlPanel.tsx \
-  && cp /tmp/production-fixes/NotificationCenter.tsx /app/site/components/service/NotificationCenter.tsx \
-  && cp /tmp/production-fixes/BranchManager.tsx /app/site/components/admin/BranchManager.tsx \
-  && cp /tmp/production-fixes/PromotionManager.tsx /app/site/components/service/PromotionManager.tsx \
   && cp /tmp/production-fixes/PosTerminal.tsx /app/site/components/core/PosTerminal.tsx \
   && cp /tmp/production-fixes/pos-page.tsx /app/site/app/pos/page.tsx \
   && cp /tmp/production-fixes/FinishedGoodsManager.tsx /app/site/components/operations/FinishedGoodsManager.tsx \
-  && cp /tmp/production-fixes/ProductionManager.tsx /app/site/components/operations/ProductionManager.tsx \
   && find /app/site/app /app/site/components -type f -name '*.tsx' -exec sed -i 's#/ds-bakery-logo.svg#/ds-bakery-logo.png#g' {} + \
   && cp /app/site/public/ds-bakery-logo.png /app/site/app/icon.png \
   && cp /app/site/public/ds-bakery-logo.png /app/site/app/apple-icon.png \
