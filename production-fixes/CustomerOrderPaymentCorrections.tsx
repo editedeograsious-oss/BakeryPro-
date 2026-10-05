@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect,useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ugx } from "@/lib/costing";
 
 export default function CustomerOrderPaymentCorrections({live,canCorrect}:{live:boolean;canCorrect:boolean}){
+  const router=useRouter();
   const [rows,setRows]=useState<any[]>([]);
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
@@ -42,6 +44,7 @@ export default function CustomerOrderPaymentCorrections({live,canCorrect}:{live:
       if(error)throw error;
       setMessage("Customer-order payment corrected.");
       await load();
+      router.refresh();
     }catch(e){setMessage(e instanceof Error?e.message:"Could not correct payment.");}
     finally{setBusy(false);}
   }
@@ -57,6 +60,7 @@ export default function CustomerOrderPaymentCorrections({live,canCorrect}:{live:
       if(error)throw error;
       setMessage("Customer-order payment voided.");
       await load();
+      router.refresh();
     }catch(e){setMessage(e instanceof Error?e.message:"Could not void payment.");}
     finally{setBusy(false);}
   }
@@ -71,6 +75,7 @@ export default function CustomerOrderPaymentCorrections({live,canCorrect}:{live:
       if(error)throw error;
       setMessage("Customer-order payment restored.");
       await load();
+      router.refresh();
     }catch(e){setMessage(e instanceof Error?e.message:"Could not restore payment.");}
     finally{setBusy(false);}
   }
