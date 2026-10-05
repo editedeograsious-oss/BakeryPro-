@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ugx } from "@/lib/costing";
@@ -23,10 +23,24 @@ export default function SupplierAccountsPanel({
   const requestId=useRef(crypto.randomUUID());
 
   const current=accounts.find(a=>a.supplier_id===supplierId);
-  const currentPurchase=payables.find(p=>p.id===purchaseId);
+  const currentPurchase=payables.find(p=>p.id===purchaseId&&p.supplier_id===supplierId);
   const supplierStatement=statements.filter(s=>s.supplier_id===supplierId).slice(0,30);
   const totalBalance=useMemo(()=>accounts.reduce((s,a)=>s+Number(a.outstanding_balance||0),0),[accounts]);
   const overdue=useMemo(()=>accounts.reduce((s,a)=>s+Number(a.overdue_balance||0),0),[accounts]);
+
+  useEffect(()=>{
+    if(!accounts.some(a=>a.supplier_id===supplierId)){
+      const nextSupplier=accounts[0]?.supplier_id??"";
+      setSupplierId(nextSupplier);
+      setPurchaseId(payables.find(p=>p.supplier_id===nextSupplier)?.id??"");
+      setAmount(0);setReference("");
+      return;
+    }
+    if(!payables.some(p=>p.id===purchaseId&&p.supplier_id===supplierId)){
+      setPurchaseId(payables.find(p=>p.supplier_id===supplierId)?.id??"");
+      setAmount(0);setReference("");
+    }
+  },[accounts,payables,supplierId,purchaseId]);
 
   function chooseSupplier(id:string){
     setSupplierId(id);
@@ -37,7 +51,7 @@ export default function SupplierAccountsPanel({
   }
 
   async function pay(){
-    if(!purchaseId){setMessage("Select an outstanding purchase.");return;}
+    if(!currentPurchase){setMessage("Select an outstanding purchase.");return;}
     if(amount<=0){setMessage("Payment amount must be greater than zero.");return;}
     if(currentPurchase&&amount>Number(currentPurchase.outstanding_amount)){setMessage("Payment exceeds the selected purchase balance.");return;}
     if(method!=="cash"&&!reference.trim()){setMessage("Enter a reference for bank/Mobile Money payment.");return;}
@@ -50,7 +64,7 @@ export default function SupplierAccountsPanel({
         p_amount:amount,
         p_method:method,
         p_reference:reference.trim()||null,
-        p_shift_id:shiftId||null,
+        p_shift_id:method==="cash"?(shiftId||null):null,
         p_client_request_id:requestId.current,
       });
       if(error)throw error;
@@ -111,7 +125,7 @@ export default function SupplierAccountsPanel({
           <thead><tr><th>Date</th><th>Reference</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead>
           <tbody>{supplierStatement.length===0?<tr><td colSpan={5}>No statement lines.</td></tr>:supplierStatement.map((s:any)=><tr key={`${s.line_type}-${s.source_id}`}>
             <td>{new Date(s.occurred_at).toLocaleDateString()}</td>
-            <td>{s.reference}</td>
+            <td>{s.reference}{s.voided_at&&<span className="badge red" style={{marginLeft:6}}>VOIDED</span>}{!s.voided_at&&s.edited_at&&<span className="badge gold" style={{marginLeft:6}}>EDITED</span>}</td>
             <td>{Number(s.debit)>0?ugx(Number(s.debit)):"—"}</td>
             <td>{Number(s.credit)>0?ugx(Number(s.credit)):"—"}</td>
             <td><b>{ugx(Number(s.running_balance))}</b></td>
@@ -136,7 +150,7 @@ export default function SupplierAccountsPanel({
           {shifts.map(s=><option key={s.id} value={s.id}>{s.cashier_name} • open shift</option>)}
         </select></div>}
         {currentPurchase&&<p style={{color:"var(--muted)"}}>Maximum payment now: <b>{ugx(Number(currentPurchase.outstanding_amount||0))}</b></p>}
-        <button className="btn primary" style={{width:"100%"}} disabled={busy||!purchaseId} onClick={pay}>{busy?"Working...":"Record Payment"}</button>
+        <button className="btn primary" style={{width:"100%"}} disabled={busy||!currentPurchase} onClick={pay}>{busy?"Working...":"Record Payment"}</button>
       </div>
     </div>
 
