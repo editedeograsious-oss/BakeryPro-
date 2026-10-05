@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect,useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ugx } from "@/lib/costing";
 
 export default function SupplierPaymentCorrections({live,canCorrect}:{live:boolean;canCorrect:boolean}){
+  const router=useRouter();
   const [rows,setRows]=useState<any[]>([]);
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
@@ -43,6 +45,7 @@ export default function SupplierPaymentCorrections({live,canCorrect}:{live:boole
       if(error)throw error;
       setMessage("Supplier payment corrected.");
       await load();
+      router.refresh();
     }catch(e){setMessage(e instanceof Error?e.message:"Could not correct supplier payment.");}
     finally{setBusy(false);}
   }
@@ -59,11 +62,13 @@ export default function SupplierPaymentCorrections({live,canCorrect}:{live:boole
       if(error)throw error;
       setMessage("Supplier payment voided and purchase balance recalculated.");
       await load();
+      router.refresh();
     }catch(e){setMessage(e instanceof Error?e.message:"Could not void supplier payment.");}
     finally{setBusy(false);}
   }
 
   async function restore(row:any){
+    if(!canCorrect){setMessage("You do not have correction permission.");return;}
     const why=window.prompt("Reason for restoring this supplier payment:");
     if(!why?.trim())return;
     setBusy(true);setMessage("");
@@ -73,6 +78,7 @@ export default function SupplierPaymentCorrections({live,canCorrect}:{live:boole
       if(error)throw error;
       setMessage("Supplier payment restored.");
       await load();
+      router.refresh();
     }catch(e){setMessage(e instanceof Error?e.message:"Could not restore supplier payment.");}
     finally{setBusy(false);}
   }
