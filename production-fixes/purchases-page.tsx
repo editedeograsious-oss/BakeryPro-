@@ -9,22 +9,22 @@ export const revalidate=0;
 
 export default async function Purchases(){
   await requireStaff(["owner","manager","storekeeper"]);
+  const data=await getPurchaseReceivingData();
+  let lines=data.lines;
 
-  const base=await getPurchaseReceivingData();
-  let lines=base.lines??[];
-
-  if(!base.demo){
+  if(!data.demo){
     const supabase=await createClient();
-    const {data,error}=await supabase
+    const {data:allLines,error}=await supabase
       .from("purchase_receiving_lines")
       .select("*")
       .order("purchase_date",{ascending:false})
-      .order("purchase_no",{ascending:false});
+      .order("purchase_no",{ascending:false})
+      .limit(300);
     if(error)throw error;
-    lines=data??[];
+    lines=allLines??[];
   }
 
   return <div className="shell"><Sidebar/><main className="main">
-    <PurchaseReceivingPanel lines={lines} live={!base.demo}/>
+    <PurchaseReceivingPanel lines={lines} live={!data.demo}/>
   </main></div>;
 }
