@@ -16,19 +16,24 @@ export default async function PayrollPage(){
 
   if(!data.demo){
     const supabase=await createClient();
-    const [{data:meta,error:metaError},{data:allowed,error:permissionError}]=await Promise.all([
-      supabase
+    let meta:any[]=[];
+    const baseItems=data.items??[];
+    if(baseItems.length>0){
+      const {data:rows,error:metaError}=await supabase
         .from("payroll_items")
         .select("id,voided_at,void_reason,restored_at,restore_reason,reopened_at,reopen_reason")
-        .in("id",(data.items??[]).map((x:any)=>x.id)),
-      supabase.rpc("staff_has_permission",{p_permission_key:"records:correct"}),
-    ]);
+        .in("id",baseItems.map((x:any)=>x.id));
+      if(metaError)throw metaError;
+      meta=rows??[];
+    }
 
-    if(metaError && (data.items??[]).length>0)throw metaError;
+    const {data:allowed,error:permissionError}=await supabase.rpc(
+      "staff_has_permission",{p_permission_key:"records:correct"}
+    );
     if(permissionError)throw permissionError;
 
-    const byId=new Map((meta??[]).map((x:any)=>[x.id,x]));
-    items=(data.items??[]).map((x:any)=>({...x,...(byId.get(x.id)??{})}));
+    const byId=new Map(meta.map((x:any)=>[x.id,x]));
+    items=baseItems.map((x:any)=>({...x,...(byId.get(x.id)??{})}));
     canCorrect=allowed===true;
   }
 
