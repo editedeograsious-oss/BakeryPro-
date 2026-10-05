@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 
 const ALLOWED_ROLES=["manager","cashier","baker","storekeeper"] as const;
 
 export async function POST(request:Request){
-  const supabase=await createClient();
-  const {data:{user}}=await supabase.auth.getUser();
-  if(!user)return NextResponse.json({error:"Authentication required."},{status:401});
-
-  const {data:profile}=await supabase.from("profiles").select("role,active,disabled_at").eq("id",user.id).single();
-  if(!profile||profile.role!=="owner"||!profile.active||profile.disabled_at){
-    return NextResponse.json({error:"Owner authorization required."},{status:403});
+  const authHeader=request.headers.get("authorization")??"";
+  if(!authHeader.startsWith("Bearer ")){
+    return NextResponse.json({error:"Authentication required."},{status:401});
   }
 
   const body=await request.json().catch(()=>null);
@@ -20,11 +15,6 @@ export async function POST(request:Request){
 
   if(!email||!fullName||!ALLOWED_ROLES.includes(role as any)){
     return NextResponse.json({error:"Valid email, name and staff role are required."},{status:400});
-  }
-
-  const {data:{session}}=await supabase.auth.getSession();
-  if(!session?.access_token){
-    return NextResponse.json({error:"Your secure session has expired. Sign in again and retry."},{status:401});
   }
 
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -38,7 +28,7 @@ export async function POST(request:Request){
     method:"POST",
     headers:{
       "content-type":"application/json",
-      "authorization":`Bearer ${session.access_token}`,
+      "authorization":authHeader,
       "apikey":publicKey,
     },
     body:JSON.stringify({email,full_name:fullName,role,redirect_to:redirectTo}),
