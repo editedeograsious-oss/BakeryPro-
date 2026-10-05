@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect,useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ugx } from "@/lib/costing";
 
 export default function CreditPaymentCorrections({live,canCorrect}:{live:boolean;canCorrect:boolean}){
+  const router=useRouter();
   const [rows,setRows]=useState<any[]>([]);
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
@@ -34,6 +36,7 @@ export default function CreditPaymentCorrections({live,canCorrect}:{live:boolean
       if(error)throw error;
       setMessage("Credit repayment reversed. Enter the correct repayment if needed.");
       await load();
+      router.refresh();
     }catch(e){setMessage(e instanceof Error?e.message:"Could not reverse credit payment.");}
     finally{setBusy(false);}
   }
@@ -48,6 +51,7 @@ export default function CreditPaymentCorrections({live,canCorrect}:{live:boolean
       if(error)throw error;
       setMessage("Credit repayment restored.");
       await load();
+      router.refresh();
     }catch(e){setMessage(e instanceof Error?e.message:"Could not restore credit payment.");}
     finally{setBusy(false);}
   }
