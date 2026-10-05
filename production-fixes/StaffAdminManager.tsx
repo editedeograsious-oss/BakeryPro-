@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -15,6 +15,7 @@ const ROLE_LABELS:Record<string,string>={
 
 export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean}){
   const router=useRouter();
+  const [rows,setRows]=useState<any[]>(staff??[]);
   const [email,setEmail]=useState("");
   const [name,setName]=useState("");
   const [role,setRole]=useState("cashier");
@@ -24,6 +25,31 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
   const [accessStaff,setAccessStaff]=useState<any|null>(null);
   const [permissions,setPermissions]=useState<any[]>([]);
   const [accessBusy,setAccessBusy]=useState(false);
+  const [editStaff,setEditStaff]=useState<any|null>(null);
+  const [editName,setEditName]=useState("");
+  const [editRole,setEditRole]=useState("cashier");
+
+  useEffect(()=>{ void refreshRows(); },[]);
+
+  async function refreshRows(){
+    if(!live)return;
+    try{
+      const supabase=createClient();
+      const {data,error}=await supabase
+        .from("profiles")
+        .select("id,full_name,role,active,session_version,disabled_at,branch_id,removed_at,removed_by,removal_reason,created_at,updated_at")
+        .order("created_at",{ascending:true});
+      if(error)throw error;
+
+      const priorById=new Map((rows.length?rows:staff).map((s:any)=>[s.id,s]));
+      setRows((data??[]).map((s:any)=>({
+        ...priorById.get(s.id),
+        ...s,
+      })));
+    }catch(e){
+      setMessage(e instanceof Error?e.message:"Could not refresh staff list.");
+    }
+  }
 
   async function ownerSession(){
     const supabase=createClient();
@@ -57,8 +83,78 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
       if(!res.ok)throw new Error(body?.error??"Could not create staff account.");
       setMessage("Staff account created. They can sign in immediately with the email and initial password. Use Manage Access to adjust what they can open.");
       setEmail("");setName("");setRole("cashier");setInitialPassword("");
+      await refreshRows();
       router.refresh();
     }catch(e){setMessage(e instanceof Error?e.message:"Could not create staff account.");}
+    finally{setBusy(false);}
+  }
+
+  function openEdit(row:any){
+    if(row.role==="owner"){setMessage("CEO / Owner account is protected.");return;}
+    setEditStaff(row);
+    setEditName(row.full_name??"");
+    setEditRole(row.role??"cashier");
+    setMessage("");
+  }
+
+  async function saveEdit(){
+    if(!editStaff)return;
+    if(!editName.trim()){setMessage("Staff name is required.");return;}
+    if(!live){setMessage("Demo mode: staff edit simulated.");return;}
+    setBusy(true);setMessage("");
+    try{
+      const supabase=createClient();
+      const {error}=await supabase.rpc("edit_staff_member",{
+        p_staff_id:editStaff.id,
+        p_full_name:editName.trim(),
+        p_role:editRole,
+      });
+      if(error)throw error;
+      setMessage("Staff details updated.");
+      setEditStaff(null);
+      await refreshRows();
+      router.refresh();
+    }catch(e){setMessage(e instanceof Error?e.message:"Could not edit staff member.");}
+    finally{setBusy(false);}
+  }
+
+  async function removeStaff(row:any){
+    if(row.role==="owner"){setMessage("CEO / Owner account is protected.");return;}
+    const reason=window.prompt(`Why are you removing ${row.full_name}? This reason will be recorded in the audit log.`);
+    if(reason===null)return;
+    if(!reason.trim()){setMessage("A removal reason is required.");return;}
+    if(!window.confirm(`Remove ${row.full_name} from active staff? Their login will be blocked, but their historical business records will be preserved.`))return;
+    if(!live){setMessage("Demo mode: staff removal simulated.");return;}
+
+    setBusy(true);setMessage("");
+    try{
+      const supabase=createClient();
+      const {error}=await supabase.rpc("remove_staff_member",{
+        p_staff_id:row.id,
+        p_reason:reason.trim(),
+      });
+      if(error)throw error;
+      if(accessStaff?.id===row.id){setAccessStaff(null);setPermissions([]);}
+      if(editStaff?.id===row.id)setEditStaff(null);
+      setMessage("Staff member removed from active staff. Their history was preserved and they can be restored later.");
+      await refreshRows();
+      router.refresh();
+    }catch(e){setMessage(e instanceof Error?e.message:"Could not remove staff member.");}
+    finally{setBusy(false);}
+  }
+
+  async function restoreStaff(row:any){
+    if(!window.confirm(`Restore ${row.full_name} to active staff? Their access will return according to their role and any existing permission overrides.`))return;
+    if(!live){setMessage("Demo mode: staff restore simulated.");return;}
+    setBusy(true);setMessage("");
+    try{
+      const supabase=createClient();
+      const {error}=await supabase.rpc("restore_staff_member",{p_staff_id:row.id});
+      if(error)throw error;
+      setMessage("Staff member restored.");
+      await refreshRows();
+      router.refresh();
+    }catch(e){setMessage(e instanceof Error?e.message:"Could not restore staff member.");}
     finally{setBusy(false);}
   }
 
@@ -74,27 +170,9 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
       if(error)throw error;
       setMessage(row.active?"Staff account disabled.":"Staff account re-enabled.");
       if(accessStaff?.id===row.id)setAccessStaff({...row,active:!row.active});
+      await refreshRows();
       router.refresh();
     }catch(e){setMessage(e instanceof Error?e.message:"Could not change staff status.");}
-    finally{setBusy(false);}
-  }
-
-  async function changeRole(id:string,next:string){
-    if(!window.confirm(`Change this staff member to ${ROLE_LABELS[next]??next}? Their default access permissions will change immediately.`))return;
-    if(!live){setMessage(`Demo mode: role would change to ${ROLE_LABELS[next]??next}.`);return;}
-    setBusy(true);setMessage("");
-    try{
-      const supabase=createClient();
-      const {error}=await supabase.rpc("change_staff_role",{p_staff_id:id,p_role:next});
-      if(error)throw error;
-      setMessage("Staff role changed. Individual access overrides remain in effect.");
-      router.refresh();
-      if(accessStaff?.id===id){
-        const updated={...accessStaff,role:next};
-        setAccessStaff(updated);
-        await loadAccess(updated);
-      }
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not change role.");}
     finally{setBusy(false);}
   }
 
@@ -142,18 +220,21 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
     finally{setAccessBusy(false);}
   }
 
+  const currentRows=rows.filter(s=>!s.removed_at);
+  const removedRows=rows.filter(s=>!!s.removed_at);
+
   return <>
     <div className="pagehead">
-      <div><h1>Staff & Access</h1><p>CEO / Owner-controlled staff accounts, roles, permissions and account status.</p></div>
+      <div><h1>Staff & Access</h1><p>CEO / Owner-controlled staff accounts, roles, permissions, editing and removal.</p></div>
       <span className="badge red">CEO / Owner Only</span>
     </div>
     {message&&<div className="hero" style={{padding:14}}><b>{message}</b></div>}
 
     <div className="grid4">
-      <div className="card stat"><div className="label">Active Staff</div><div className="value">{staff.filter(s=>s.active).length}</div></div>
-      <div className="card stat"><div className="label">Disabled</div><div className="value">{staff.filter(s=>!s.active).length}</div></div>
-      <div className="card stat"><div className="label">Roles</div><div className="value">5</div></div>
-      <div className="card stat"><div className="label">CEO / Owner Accounts</div><div className="value">{staff.filter(s=>s.role==="owner").length}</div></div>
+      <div className="card stat"><div className="label">Active Staff</div><div className="value">{currentRows.filter(s=>s.active).length}</div></div>
+      <div className="card stat"><div className="label">Disabled</div><div className="value">{currentRows.filter(s=>!s.active).length}</div></div>
+      <div className="card stat"><div className="label">Removed</div><div className="value">{removedRows.length}</div></div>
+      <div className="card stat"><div className="label">CEO / Owner Accounts</div><div className="value">{currentRows.filter(s=>s.role==="owner").length}</div></div>
     </div>
 
     <div className="card" style={{marginTop:16}}>
@@ -171,18 +252,48 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
       <p style={{color:"var(--muted)",fontSize:12}}>The initial password is sent only to Supabase Auth and is not stored in DS Bakery records or audit logs. Do not reuse your Owner password.</p>
     </div>
 
+    {editStaff&&<div className="card" style={{marginTop:16}}>
+      <div className="pagehead" style={{marginBottom:8}}>
+        <div><h2 style={{margin:0}}>Edit Staff — {editStaff.full_name}</h2><p style={{marginTop:6}}>Update the staff member's name or business role.</p></div>
+        <button className="btn secondary" onClick={()=>setEditStaff(null)}>Cancel</button>
+      </div>
+      <div className="grid2">
+        <div className="field"><label>Full name</label><input value={editName} onChange={e=>setEditName(e.target.value)}/></div>
+        <div className="field"><label>Role</label><select value={editRole} onChange={e=>setEditRole(e.target.value)}>{ROLES.map(r=><option key={r} value={r}>{ROLE_LABELS[r]??r}</option>)}</select></div>
+      </div>
+      <button className="btn primary" disabled={busy} onClick={saveEdit}>{busy?"Saving…":"Save Changes"}</button>
+    </div>}
+
     <div className="tablewrap" style={{marginTop:16}}>
-      <table><thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Last Sign-In</th><th>Role Change</th><th>Access</th><th>Account</th></tr></thead>
-      <tbody>{staff.map(s=><tr key={s.id}>
+      <table><thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Last Sign-In</th><th>Edit</th><th>Access</th><th>Account</th><th>Remove</th></tr></thead>
+      <tbody>{currentRows.map(s=><tr key={s.id}>
         <td><b>{s.full_name}</b></td>
         <td>{ROLE_LABELS[s.role]??s.role}</td>
         <td><span className={s.active?"badge green":"badge red"}>{s.active?"Active":"Disabled"}</span></td>
         <td>{s.last_sign_in_at?new Date(s.last_sign_in_at).toLocaleString():"—"}</td>
-        <td>{s.role==="owner"?<span style={{color:"var(--muted)"}}>Protected</span>:<select disabled={busy} value={s.role} onChange={e=>changeRole(s.id,e.target.value)}>{ROLES.map(r=><option key={r} value={r}>{ROLE_LABELS[r]??r}</option>)}</select>}</td>
+        <td>{s.role==="owner"?<span style={{color:"var(--muted)"}}>Protected</span>:<button className="btn secondary" disabled={busy} onClick={()=>openEdit(s)}>Edit Staff</button>}</td>
         <td>{s.role==="owner"?<span style={{color:"var(--muted)"}}>Full Owner Access</span>:<button className="btn secondary" disabled={busy} onClick={()=>loadAccess(s)}>Manage Access</button>}</td>
         <td>{s.role==="owner"?<span style={{color:"var(--muted)"}}>Protected CEO / Owner</span>:<button className={s.active?"btn secondary":"btn primary"} disabled={busy} onClick={()=>toggle(s)}>{s.active?"Disable":"Re-enable"}</button>}</td>
+        <td>{s.role==="owner"?<span style={{color:"var(--muted)"}}>Protected</span>:<button className="btn secondary" disabled={busy} onClick={()=>removeStaff(s)}>Remove Staff</button>}</td>
       </tr>)}</tbody></table>
     </div>
+
+    {removedRows.length>0&&<div className="card" style={{marginTop:16}}>
+      <h2 style={{color:"var(--brown)",marginTop:0}}>Removed Staff</h2>
+      <p style={{color:"var(--muted)"}}>Removed staff cannot use DS Bakery, but their historical records remain intact.</p>
+      <div className="tablewrap">
+        <table>
+          <thead><tr><th>Name</th><th>Former Role</th><th>Removed On</th><th>Reason</th><th>Action</th></tr></thead>
+          <tbody>{removedRows.map(s=><tr key={s.id}>
+            <td><b>{s.full_name}</b></td>
+            <td>{ROLE_LABELS[s.role]??s.role}</td>
+            <td>{s.removed_at?new Date(s.removed_at).toLocaleString():"—"}</td>
+            <td>{s.removal_reason??"—"}</td>
+            <td><button className="btn primary" disabled={busy} onClick={()=>restoreStaff(s)}>Restore Staff</button></td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    </div>}
 
     {accessStaff&&<div className="card" style={{marginTop:16}}>
       <div className="pagehead" style={{marginBottom:8}}>
@@ -218,7 +329,7 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
 
     <div className="hero" style={{marginTop:16}}>
       <h2>Owner remains protected</h2>
-      <p>Staff can be given only the access they need. The CEO / Owner role cannot be assigned, edited or disabled from this screen. Every role change, permission override and account-status change is audited.</p>
+      <p>The CEO / Owner account cannot be edited, disabled or removed here. Staff edits, removals, restores, role changes and permission changes are all recorded in the audit history.</p>
     </div>
   </>;
 }
