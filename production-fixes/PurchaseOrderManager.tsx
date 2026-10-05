@@ -9,9 +9,9 @@ import RecycleActionButton from "@/components/admin/RecycleActionButton";
 type DraftLine={raw_material_id:string;ordered_qty_base:number;unit_cost_base:number};
 
 export default function PurchaseOrderManager({
-  orders,suppliers,materials,live,canApprove
+  orders,suppliers,materials,orderLines=[],live,canApprove,canCorrect=true
 }:{
-  orders:any[];suppliers:any[];materials:any[];live:boolean;canApprove:boolean;
+  orders:any[];suppliers:any[];materials:any[];orderLines?:any[];live:boolean;canApprove:boolean;canCorrect?:boolean;
 }){
   const router=useRouter();
   const [supplierId,setSupplierId]=useState(suppliers[0]?.id??"");
@@ -52,6 +52,7 @@ export default function PurchaseOrderManager({
   }
 
   async function beginEdit(order:any){
+    if(!canCorrect){setMessage("You do not have permission to correct purchase orders.");return;}
     if(order.status!=="draft"||order.approval_status!=="pending"){
       setMessage("Only pending draft purchase orders can be edited.");
       return;
@@ -60,16 +61,18 @@ export default function PurchaseOrderManager({
     setBusy(true);setMessage("");
     try{
       const supabase=createClient();
-      const [{data:p,error:pErr},{data:items,error:iErr}]=await Promise.all([
-        supabase.from("purchases")
-          .select("id,supplier_id,purchase_date,supplier_invoice_no,invoice_date,credit_terms_days,discount,notes,status,approval_status")
-          .eq("id",order.id).single(),
-        supabase.from("purchase_items")
-          .select("raw_material_id,ordered_qty_base,unit_cost_base")
-          .eq("purchase_id",order.id)
-          .order("created_at"),
-      ]);
-      if(pErr)throw pErr;if(iErr)throw iErr;
+      const {data:p,error:pErr}=await supabase.from("purchases")
+        .select("id,supplier_id,purchase_date,supplier_invoice_no,invoice_date,credit_terms_days,discount,notes,status,approval_status")
+        .eq("id",order.id).single();
+      if(pErr)throw pErr;
+      let items=orderLines.filter((x:any)=>x.purchase_id===order.id);
+      if(items.length===0){
+        const {data:itemRows,error:iErr}=await supabase.from("purchase_items")
+          .select("purchase_id,raw_material_id,ordered_qty_base,unit_cost_base")
+          .eq("purchase_id",order.id);
+        if(iErr)throw iErr;
+        items=itemRows??[];
+      }
       setEditingId(order.id);
       setSupplierId(p.supplier_id);
       setPurchaseDate(p.purchase_date);
@@ -223,7 +226,7 @@ export default function PurchaseOrderManager({
           <td>{String(o.payment_status).replaceAll("_"," ")}</td>
           <td>{o.due_date??"—"}</td>
           <td><div className="action-row">
-            {o.status==="draft"&&o.approval_status==="pending"&&<button className="btn secondary" disabled={busy} onClick={()=>beginEdit(o)}>Edit</button>}
+            {canCorrect&&o.status==="draft"&&o.approval_status==="pending"&&<button className="btn secondary" disabled={busy} onClick={()=>beginEdit(o)}>Edit</button>}
             {canApprove&&o.approval_status==="pending"&&<><button className="btn primary" disabled={busy} onClick={()=>decide(o.id,"approve")}>Approve</button><button className="btn secondary" disabled={busy} onClick={()=>decide(o.id,"reject")}>Reject</button></>}
             {canApprove&&["draft","ordered"].includes(o.status)&&Number(o.amount_paid||0)===0&&<RecycleActionButton entityType="purchase" entityId={o.id} label={o.purchase_no??"Purchase"} live={live}/>}
           </div></td>
