@@ -33,6 +33,7 @@ export default function CashMovementManager({
 
   async function save(){
     if(amount<=0||!reason.trim()){setMessage("Positive amount and reason are required.");return;}
+    if(role==="cashier"&&shifts.length===0){setMessage("Open your cashier shift before recording Cash In / Cash Out.");return;}
     if(!live){setMessage("Demo mode: cash movement simulated.");return;}
     setBusy(true);setMessage("");
     try{
@@ -42,11 +43,11 @@ export default function CashMovementManager({
         p_amount:amount,
         p_reason:reason.trim(),
         p_reference:reference.trim()||null,
-        p_shift_id:shiftId||null,
+        p_shift_id:role==="cashier"?null:(shiftId||null),
         p_client_request_id:requestId.current,
       });
       if(error)throw error;
-      setMessage(`Cash movement recorded • ${data}`);
+      setMessage(`${type==="cash_in"?"Cash In":"Cash Out"} recorded successfully • ${data}`);
       requestId.current=crypto.randomUUID();
       setAmount(0);setReason("");setReference("");
       router.refresh();
@@ -141,9 +142,12 @@ export default function CashMovementManager({
     {message&&<div className="hero" style={{padding:14}}><b>{message}</b></div>}
 
     <div className="hero">
-      <h2>Corrections are protected</h2>
-      <p>If you make a mistake, use <b>Edit</b> to correct it or <b>Delete / Void</b> to remove its effect from cash totals. Every correction keeps the old values, user, date and reason in the audit log.</p>
+      <h2>How Cash In / Out works</h2>
+      <p><b>Cash In</b> adds physical cash to the till/business cash. <b>Cash Out</b> removes physical cash from it. These entries affect Expected Cash and Daily Closing immediately. If you make a mistake, use <b>Edit</b> or <b>Delete / Void</b>; the audit history is kept.</p>
     </div>
+    {role==="cashier"&&shifts.length===0&&<div className="hero" style={{marginTop:12}}>
+      <b>No open cashier shift.</b> Open your cashier shift before recording Cash In or Cash Out.
+    </div>}
 
     <div className="grid4">
       <div className="card stat"><div className="label">Cash In</div><div className="value">{ugx(cashIn)}</div></div>
@@ -161,9 +165,12 @@ export default function CashMovementManager({
       <div className="field"><label>Reason</label><input value={reason} onChange={e=>setReason(e.target.value)} placeholder="Owner top-up / petty cash / bank deposit…"/></div>
       <div className="grid2">
         <div className="field"><label>Reference (optional)</label><input value={reference} onChange={e=>setReference(e.target.value)}/></div>
-        <div className="field"><label>Cashier shift {role==="cashier"?"(your open shift is enforced)":"(optional)"}</label><select value={shiftId} onChange={e=>setShiftId(e.target.value)}><option value="">Auto / general business cash</option>{shifts.map(s=><option key={s.id} value={s.id}>{s.cashier_name}</option>)}</select></div>
+        {role==="cashier"
+          ?<div className="field"><label>Cashier shift</label><div className="card" style={{padding:12}}>{shifts.length>0?<><b>Current open shift</b><br/><span style={{color:"var(--muted)"}}>Selected automatically</span></>:<span className="badge red">No open shift</span>}</div></div>
+          :<div className="field"><label>Cashier shift (optional)</label><select value={shiftId} onChange={e=>setShiftId(e.target.value)}><option value="">General business cash</option>{shifts.map(s=><option key={s.id} value={s.id}>{s.cashier_name}</option>)}</select></div>}
       </div>
-      <button className="btn primary" disabled={busy} onClick={save}>{busy?"Working…":"Record Movement"}</button>
+      <p style={{color:"var(--muted)",marginTop:0}}>{type==="cash_in"?"This amount will increase expected physical cash.":"This amount will reduce expected physical cash."}</p>
+      <button className="btn primary" disabled={busy||(role==="cashier"&&shifts.length===0)} onClick={save}>{busy?"Working…":type==="cash_in"?"Record Cash In":"Record Cash Out"}</button>
     </div>
 
     {editing&&<div className="card" style={{marginTop:16}}>
