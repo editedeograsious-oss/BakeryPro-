@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ugx } from "@/lib/costing";
@@ -29,10 +29,10 @@ export default function PurchaseOrderManager({
   const requestId=useRef(crypto.randomUUID());
 
   const draftTotal=Math.max(0,lines.reduce((s,l)=>s+(Number(l.ordered_qty_base)||0)*(Number(l.unit_cost_base)||0),0)-discount);
-  const totalOrdered=orders.reduce((s,o)=>s+Number(o.total_amount||0),0);
-  const totalPaid=orders.reduce((s,o)=>s+Number(o.amount_paid||0),0);
-  const totalOutstanding=orders.reduce((s,o)=>s+Number(o.outstanding_amount||0),0);
-  const openOrders=orders.filter(o=>!["received","cancelled"].includes(String(o.status))).length;
+  const totalOrdered=useMemo(()=>orders.reduce((s:number,o:any)=>s+Number(o.total_amount||0),0),[orders]);
+  const totalPaid=useMemo(()=>orders.reduce((s:number,o:any)=>s+Number(o.amount_paid||0),0),[orders]);
+  const totalOwed=useMemo(()=>orders.reduce((s:number,o:any)=>s+Number(o.outstanding_amount||0),0),[orders]);
+  const openCount=useMemo(()=>orders.filter((o:any)=>Number(o.outstanding_amount||0)>0||!["received","cancelled"].includes(o.status)).length,[orders]);
 
   function addLine(){
     if(materials[0])setLines(prev=>[...prev,{raw_material_id:materials[0].id,ordered_qty_base:1,unit_cost_base:0}]);
@@ -79,19 +79,89 @@ export default function PurchaseOrderManager({
     finally{setBusy(false);}
   }
 
+  async function editDraft(order:any){
+    if(order.status!=="draft"||order.approval_status!=="pending"){
+      setMessage("Only pending draft purchase orders can be edited.");
+      return;
+    }
+    if(!live){setMessage("Demo mode: draft correction simulated.");return;}
+
+    const reason=window.prompt("Why are you correcting this purchase order?");
+    if(!reason?.trim())return;
+
+    setBusy(true);setMessage("");
+    try{
+      const supabase=createClient();
+      const [{data:p,error:pErr},{data:itemRows,error:iErr}]=await Promise.all([
+        supabase.from("purchases")
+          .select("supplier_id,purchase_date,supplier_invoice_no,invoice_date,credit_terms_days,discount,notes")
+          .eq("id",order.id).single(),
+        supabase.from("purchase_items")
+          .select("raw_material_id,ordered_qty_base,unit_cost_base")
+          .eq("purchase_id",order.id).order("created_at"),
+      ]);
+      if(pErr)throw pErr;if(iErr)throw iErr;
+
+      const date=window.prompt("Purchase date (YYYY-MM-DD):",p.purchase_date??"");
+      if(date===null)return;
+      const inv=window.prompt("Supplier invoice number (blank if none):",p.supplier_invoice_no??"");
+      if(inv===null)return;
+      const invDate=window.prompt("Invoice date YYYY-MM-DD (blank if none):",p.invoice_date??"");
+      if(invDate===null)return;
+      const creditRaw=window.prompt("Credit terms in days:",String(p.credit_terms_days??0));
+      if(creditRaw===null)return;
+      const discountRaw=window.prompt("Discount (UGX):",String(p.discount??0));
+      if(discountRaw===null)return;
+      const note=window.prompt("Notes:",p.notes??"");
+      if(note===null)return;
+
+      const corrected:any[]=[];
+      for(const item of itemRows??[]){
+        const material=materials.find((m:any)=>m.id===item.raw_material_id);
+        const qtyRaw=window.prompt(`Quantity for ${material?.name??"material"}:`,String(item.ordered_qty_base));
+        if(qtyRaw===null)return;
+        const costRaw=window.prompt(`Cost per ${material?.base_unit??"unit"} for ${material?.name??"material"}:`,String(item.unit_cost_base));
+        if(costRaw===null)return;
+        const qty=Number(qtyRaw),cost=Number(costRaw);
+        if(qty<=0||cost<0)throw new Error("Corrected quantities must be positive and costs cannot be negative.");
+        corrected.push({raw_material_id:item.raw_material_id,ordered_qty_base:qty,unit_cost_base:cost});
+      }
+
+      const {error}=await supabase.rpc("edit_purchase_order",{
+        p_purchase_id:order.id,
+        p_supplier_id:p.supplier_id,
+        p_purchase_date:date,
+        p_supplier_invoice_no:inv.trim()||null,
+        p_invoice_date:invDate.trim()||null,
+        p_credit_terms_days:Number(creditRaw),
+        p_discount:Number(discountRaw),
+        p_notes:note.trim()||null,
+        p_items:corrected,
+        p_reason:reason.trim(),
+      });
+      if(error)throw error;
+      setMessage("Purchase order corrected.");
+      router.refresh();
+    }catch(e){setMessage(e instanceof Error?e.message:"Could not edit purchase order.");}
+    finally{setBusy(false);}
+  }
+
   return <>
     <div className="pagehead">
-      <div><h1>Purchase Orders</h1><p>Create, approve and track supplier purchases from order through payment.</p></div>
-      <span className={canApprove?"badge green":"badge gold"}>{canApprove?"Approval Access":"Storekeeper View"}</span>
+      <div><h1>Purchase Orders</h1><p>Create, approve and track supplier purchases from order to payment.</p></div>
+      <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+        <a className="btn secondary" href="/purchases">Receive Stock</a>
+        <a className="btn secondary" href="/supplier-accounts">Supplier Accounts</a>
+      </div>
     </div>
 
     {message&&<div className="hero" style={{padding:14}}><b>{message}</b></div>}
 
     <div className="grid4">
-      <div className="card stat"><div className="label">Purchase Orders</div><div className="value">{orders.length}</div></div>
-      <div className="card stat"><div className="label">Ordered Value</div><div className="value">{ugx(totalOrdered)}</div></div>
-      <div className="card stat"><div className="label">Paid to Suppliers</div><div className="value">{ugx(totalPaid)}</div></div>
-      <div className="card stat"><div className="label">Balance Owed</div><div className="value">{ugx(totalOutstanding)}</div><div style={{fontSize:12,color:"var(--muted)"}}>{openOrders} open orders</div></div>
+      <div className="card stat"><div className="label">Purchase Value</div><div className="value">{ugx(totalOrdered)}</div></div>
+      <div className="card stat"><div className="label">Paid</div><div className="value">{ugx(totalPaid)}</div></div>
+      <div className="card stat"><div className="label">Amount Owed</div><div className="value">{ugx(totalOwed)}</div></div>
+      <div className="card stat"><div className="label">Open / Unsettled</div><div className="value">{openCount}</div></div>
     </div>
 
     <div className="card" style={{marginTop:16}}>
@@ -127,7 +197,7 @@ export default function PurchaseOrderManager({
 
     <div className="tablewrap" style={{marginTop:16}}>
       <table>
-        <thead><tr><th>PO / Invoice</th><th>Supplier</th><th>Total</th><th>Paid</th><th>Balance</th><th>Approval</th><th>Receiving</th><th>Payment</th><th>Due</th><th>Action</th></tr></thead>
+        <thead><tr><th>PO</th><th>Supplier</th><th>Total</th><th>Paid</th><th>Owed</th><th>Approval</th><th>Receiving</th><th>Payment</th><th>Due</th><th>Actions</th></tr></thead>
         <tbody>{orders.length===0?<tr><td colSpan={10}>No purchase orders found.</td></tr>:orders.map(o=><tr key={o.id}>
           <td><b>{o.purchase_no}</b>{o.supplier_invoice_no&&<><br/><span style={{fontSize:12,color:"var(--muted)"}}>Invoice {o.supplier_invoice_no}</span></>}</td>
           <td>{o.supplier_name}</td>
@@ -135,24 +205,21 @@ export default function PurchaseOrderManager({
           <td>{ugx(Number(o.amount_paid||0))}</td>
           <td><b>{ugx(Number(o.outstanding_amount||0))}</b></td>
           <td><span className={o.approval_status==="approved"?"badge green":o.approval_status==="pending"?"badge gold":"badge red"}>{String(o.approval_status).toUpperCase()}</span></td>
-          <td><span className={o.status==="received"?"badge green":o.status==="partially_received"?"badge gold":"badge"}>{String(o.status).replaceAll("_"," ").toUpperCase()}</span></td>
-          <td><span className={o.payment_status==="paid"?"badge green":o.payment_status==="partial"?"badge gold":"badge"}>{String(o.payment_status).toUpperCase()}</span></td>
+          <td><span className={o.status==="received"?"badge green":o.status==="partially_received"?"badge gold":"badge"}>{String(o.status??"").replaceAll("_"," ").toUpperCase()}</span></td>
+          <td><span className={o.payment_status==="paid"?"badge green":o.payment_status==="partial"?"badge gold":"badge red"}>{String(o.payment_status??"").toUpperCase()}</span></td>
           <td>{o.due_date??"—"}</td>
           <td><div className="action-row">
-            {canApprove&&o.approval_status==="pending"&&<>
-              <button className="btn primary" disabled={busy} onClick={()=>decide(o.id,"approve")}>Approve</button>
-              <button className="btn secondary" disabled={busy} onClick={()=>decide(o.id,"reject")}>Reject</button>
-            </>}
-            {canApprove&&["draft","ordered"].includes(o.status)&&Number(o.amount_paid||0)===0&&
-              <RecycleActionButton entityType="purchase" entityId={o.id} label={o.purchase_no??"Purchase"} live={live}/>}
+            {o.status==="draft"&&o.approval_status==="pending"&&<button className="btn secondary" disabled={busy} onClick={()=>editDraft(o)}>Edit Draft</button>}
+            {canApprove&&o.approval_status==="pending"&&<><button className="btn primary" disabled={busy} onClick={()=>decide(o.id,"approve")}>Approve</button><button className="btn secondary" disabled={busy} onClick={()=>decide(o.id,"reject")}>Reject</button></>}
+            {canApprove&&["draft","ordered"].includes(o.status)&&Number(o.amount_paid||0)===0&&<RecycleActionButton entityType="purchase" entityId={o.id} label={o.purchase_no??"Purchase"} live={live}/>}
           </div></td>
         </tr>)}</tbody>
       </table>
     </div>
 
     <div className="hero" style={{marginTop:16}}>
-      <h2>How purchases affect stock and supplier debt</h2>
-      <p>Creating or approving a purchase order does not increase stock. Stock increases only when goods are received. Supplier debt is tracked separately as Total − Paid = Balance Owed.</p>
+      <h2>Order, receipt and payment stay separate</h2>
+      <p>Approval does not increase stock. Stock changes only when goods are received, and supplier balances reduce only when payments are recorded.</p>
     </div>
   </>;
 }
