@@ -22,9 +22,7 @@ export default function PurchaseOrderManager({
   const [creditDays,setCreditDays]=useState(0);
   const [discount,setDiscount]=useState(0);
   const [notes,setNotes]=useState("");
-  const [lines,setLines]=useState<DraftLine[]>(
-    materials[0]?[{raw_material_id:materials[0].id,ordered_qty_base:1,unit_cost_base:0}]:[]
-  );
+  const [lines,setLines]=useState<DraftLine[]>(materials[0]?[{raw_material_id:materials[0].id,ordered_qty_base:1,unit_cost_base:0}]:[]);
   const [editingId,setEditingId]=useState("");
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
@@ -36,11 +34,7 @@ export default function PurchaseOrderManager({
     setEditingId("");
     setSupplierId(suppliers[0]?.id??"");
     setPurchaseDate(new Date().toISOString().slice(0,10));
-    setInvoiceNo("");
-    setInvoiceDate("");
-    setCreditDays(0);
-    setDiscount(0);
-    setNotes("");
+    setInvoiceNo("");setInvoiceDate("");setCreditDays(0);setDiscount(0);setNotes("");
     setLines(materials[0]?[{raw_material_id:materials[0].id,ordered_qty_base:1,unit_cost_base:0}]:[]);
   }
 
@@ -82,10 +76,10 @@ export default function PurchaseOrderManager({
     if(lines.some(l=>!l.raw_material_id||l.ordered_qty_base<=0||l.unit_cost_base<0)){setMessage("Every line needs a material, positive quantity and valid unit cost.");return;}
     if(!live){setMessage(editingId?"Demo mode: purchase correction simulated.":"Demo mode: purchase order creation simulated.");return;}
 
-    let correctionReason="";
+    let reason="";
     if(editingId){
-      correctionReason=window.prompt("Why are you correcting this purchase order?")?.trim()??"";
-      if(!correctionReason){setMessage("A correction reason is required.");return;}
+      reason=window.prompt("Why are you correcting this purchase order?")?.trim()??"";
+      if(!reason){setMessage("A correction reason is required.");return;}
     }
 
     setBusy(true);setMessage("");
@@ -102,7 +96,7 @@ export default function PurchaseOrderManager({
           p_discount:discount,
           p_notes:notes.trim()||null,
           p_items:lines,
-          p_reason:correctionReason,
+          p_reason:reason,
         });
         if(error)throw error;
         setMessage("Purchase order corrected and audit history saved.");
@@ -177,15 +171,13 @@ export default function PurchaseOrderManager({
         return <div key={i} style={{borderTop:"1px solid var(--line)",paddingTop:8,marginTop:4}}>
           <div className="grid2">
             <div className="field"><label>Material</label><select value={line.raw_material_id} onChange={e=>setLines(prev=>prev.map((x,j)=>j===i?{...x,raw_material_id:e.target.value}:x))}>{materials.map(m=><option key={m.id} value={m.id}>{m.name} ({m.base_unit})</option>)}</select></div>
-            <div>
-              <div className="grid2">
-                <div className="field"><label>Qty ({m?.base_unit??"base"})</label><input type="number" min="0.000001" step="any" value={line.ordered_qty_base} onChange={e=>setLines(prev=>prev.map((x,j)=>j===i?{...x,ordered_qty_base:Number(e.target.value)}:x))}/></div>
-                <div className="field"><label>Cost / {m?.base_unit??"unit"} (UGX)</label><input type="number" min="0" step="any" value={line.unit_cost_base} onChange={e=>setLines(prev=>prev.map((x,j)=>j===i?{...x,unit_cost_base:Number(e.target.value)}:x))}/></div>
-              </div>
+            <div className="grid2">
+              <div className="field"><label>Qty ({m?.base_unit??"base"})</label><input type="number" min="0.000001" step="any" value={line.ordered_qty_base} onChange={e=>setLines(prev=>prev.map((x,j)=>j===i?{...x,ordered_qty_base:Number(e.target.value)}:x))}/></div>
+              <div className="field"><label>Cost / {m?.base_unit??"unit"} (UGX)</label><input type="number" min="0" step="any" value={line.unit_cost_base} onChange={e=>setLines(prev=>prev.map((x,j)=>j===i?{...x,unit_cost_base:Number(e.target.value)}:x))}/></div>
             </div>
           </div>
           {lines.length>1&&<button className="btn secondary" onClick={()=>removeLine(i)}>Remove Line</button>}
-        </div>
+        </div>;
       })}
       <button className="btn secondary" onClick={addLine}>+ Line</button>
       <div className="field"><label>Notes</label><input value={notes} onChange={e=>setNotes(e.target.value)}/></div>
@@ -194,13 +186,10 @@ export default function PurchaseOrderManager({
     </div>
 
     <div className="tablewrap" style={{marginTop:16}}>
-      <table><thead><tr>
-        <th>PO / Invoice</th><th>Supplier</th><th>Items / Receipt</th><th>Total</th><th>Paid</th><th>Outstanding</th>
-        <th>Approval</th><th>Stock Status</th><th>Payment</th><th>Due</th><th>Actions</th>
-      </tr></thead>
+      <table><thead><tr><th>PO / Invoice</th><th>Supplier</th><th>Items / Receipt</th><th>Total</th><th>Paid</th><th>Outstanding</th><th>Approval</th><th>Stock Status</th><th>Payment</th><th>Due</th><th>Actions</th></tr></thead>
       <tbody>{orders.length===0?<tr><td colSpan={11}>No purchase orders found.</td></tr>:orders.map(o=>{
         const itemRows=orderLines.filter((l:any)=>l.purchase_id===o.id);
-        const safelyEditable=canCorrect&&o.status==="draft"&&o.approval_status==="pending"&&Number(o.amount_paid||0)===0&&!itemRows.some((l:any)=>Number(l.received_qty_base||0)>0);
+        const editable=canCorrect&&o.status==="draft"&&o.approval_status==="pending"&&Number(o.amount_paid||0)===0&&!itemRows.some((l:any)=>Number(l.received_qty_base||0)>0);
         return <tr key={o.id}>
           <td><b>{o.purchase_no}</b><br/><span style={{fontSize:12,color:"var(--muted)"}}>{o.supplier_invoice_no||"No supplier invoice"}{o.invoice_date?` • ${o.invoice_date}`:""}</span></td>
           <td>{o.supplier_name}</td>
@@ -216,7 +205,7 @@ export default function PurchaseOrderManager({
           <td>{String(o.payment_status).replaceAll("_"," ")}</td>
           <td>{o.due_date??"—"}</td>
           <td><div className="action-row">
-            {safelyEditable&&<button className="btn secondary" disabled={busy} onClick={()=>startEdit(o)}>Edit</button>}
+            {editable&&<button className="btn secondary" disabled={busy} onClick={()=>startEdit(o)}>Edit</button>}
             {canApprove&&o.approval_status==="pending"&&<><button className="btn primary" disabled={busy} onClick={()=>decide(o.id,"approve")}>Approve</button><button className="btn secondary" disabled={busy} onClick={()=>decide(o.id,"reject")}>Reject</button></>}
             {canApprove&&["draft","ordered"].includes(o.status)&&Number(o.amount_paid||0)===0&&<RecycleActionButton entityType="purchase" entityId={o.id} label={o.purchase_no??"Purchase"} live={live}/>}
           </div></td>
@@ -226,7 +215,7 @@ export default function PurchaseOrderManager({
 
     <div className="hero" style={{marginTop:16}}>
       <h2>Approval does not change stock</h2>
-      <p>Inventory increases only when goods are actually received. Once a purchase has received stock or supplier payments, use controlled accounting/stock corrections rather than rewriting its history.</p>
+      <p>Inventory increases only when goods are actually received. Once a purchase has received stock or supplier payments, use controlled accounting or stock corrections rather than rewriting its history.</p>
     </div>
   </>;
 }
