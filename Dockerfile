@@ -24,6 +24,8 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && cp /tmp/production-fixes/cash-movements-page.tsx /app/site/app/cash-movements/page.tsx \
   && cp /tmp/production-fixes/ExpenseCorrectionActions.tsx /app/site/components/finance/ExpenseCorrectionActions.tsx \
   && cp /tmp/production-fixes/SupplierPaymentCorrections.tsx /app/site/components/finance/SupplierPaymentCorrections.tsx \
+  && cp /tmp/production-fixes/PurchaseOrderManager.tsx /app/site/components/operations/PurchaseOrderManager.tsx \
+  && cp /tmp/production-fixes/SupplierAccountsPanel.tsx /app/site/components/operations/SupplierAccountsPanel.tsx \
   && cp /tmp/production-fixes/CustomerOrderPaymentCorrections.tsx /app/site/components/finance/CustomerOrderPaymentCorrections.tsx \
   && cp /tmp/production-fixes/CreditPaymentCorrections.tsx /app/site/components/finance/CreditPaymentCorrections.tsx \
   && cp /tmp/production-fixes/ExpenseManager.tsx /app/site/components/operations/ExpenseManager.tsx \
