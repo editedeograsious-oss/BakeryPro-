@@ -16,6 +16,7 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && unzip -qo /tmp/v038-patch.zip -d /app/site \
   && cp /tmp/production-fixes/PurchaseOrderManager.tsx /app/site/components/operations/PurchaseOrderManager.tsx \
   && cp /tmp/production-fixes/PurchaseReceivingPanel.tsx /app/site/components/operations/PurchaseReceivingPanel.tsx \
+  && cp /tmp/production-fixes/purchases-page.tsx /app/site/app/purchases/page.tsx \
   && cp /tmp/production-fixes/SupplierAccountsPanel.tsx /app/site/components/operations/SupplierAccountsPanel.tsx \
   && cp /tmp/production-fixes/SupplierPaymentCorrections.tsx /app/site/components/finance/SupplierPaymentCorrections.tsx \
   && cp /tmp/production-fixes/supplier-accounts-page.tsx /app/site/app/supplier-accounts/page.tsx \
