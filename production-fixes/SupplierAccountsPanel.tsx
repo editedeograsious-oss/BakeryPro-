@@ -6,9 +6,10 @@ import { createClient } from "@/lib/supabase/client";
 import { ugx } from "@/lib/costing";
 
 export default function SupplierAccountsPanel({
-  accounts,statements,payables,shifts,live
+  accounts,statements,payables,shifts,live,operationsAllowed=true,operationsReason="Business operations are enabled"
 }:{
   accounts:any[];statements:any[];payables:any[];shifts:any[];live:boolean;
+  operationsAllowed?:boolean;operationsReason?:string;
 }){
   const router=useRouter();
   const [supplierId,setSupplierId]=useState(accounts[0]?.supplier_id??"");
@@ -36,6 +37,7 @@ export default function SupplierAccountsPanel({
   }
 
   async function pay(){
+    if(!operationsAllowed){setMessage(operationsReason);return;}
     if(!purchaseId){setMessage("Select an outstanding purchase.");return;}
     if(amount<=0){setMessage("Payment amount must be greater than zero.");return;}
     if(currentPurchase&&amount>Number(currentPurchase.outstanding_amount)){setMessage("Payment exceeds the selected purchase balance.");return;}
@@ -71,6 +73,7 @@ export default function SupplierAccountsPanel({
       </div>
     </div>
 
+    {!operationsAllowed&&<div className="hero" style={{padding:14}}><b>Live operations are locked.</b><div style={{marginTop:4}}>{operationsReason}</div></div>}
     {message&&<div className="hero" style={{padding:14}}><b>{message}</b></div>}
 
     <div className="grid4">
@@ -128,7 +131,7 @@ export default function SupplierAccountsPanel({
         <div className="field"><label>Method</label><select value={method} onChange={e=>setMethod(e.target.value)}><option value="bank">Bank</option><option value="cash">Cash</option><option value="mtn_momo">MTN MoMo</option><option value="airtel_money">Airtel Money</option></select></div>
         {method!=="cash"&&<div className="field"><label>Reference</label><input value={reference} onChange={e=>setReference(e.target.value)}/></div>}
         {method==="cash"&&<div className="field"><label>Cashier shift (optional)</label><select value={shiftId} onChange={e=>setShiftId(e.target.value)}><option value="">General business cash</option>{shifts.map((s:any)=><option key={s.id} value={s.id}>{s.cashier_name} — open shift</option>)}</select></div>}
-        <button className="btn primary" style={{width:"100%"}} disabled={busy} onClick={pay}>{busy?"Working...":"Record Payment"}</button>
+        <button className="btn primary" style={{width:"100%"}} disabled={busy||!operationsAllowed} onClick={pay}>{busy?"Working...":"Record Payment"}</button>
       </div>
     </div>
 
