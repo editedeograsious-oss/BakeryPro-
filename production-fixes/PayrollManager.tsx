@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo,useState } from "react";
+import { useMemo,useRef,useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ugx } from "@/lib/costing";
@@ -14,13 +14,14 @@ const roleLabels:Record<string,string>={
 };
 
 export default function PayrollManager({
-  staff,compensation,runs,items,advances,live,canCorrect
+  staff,compensation,runs,items,advances,live,canCorrect,canManage=false,operationsAllowed=false,operationsReason="Business operations are locked."
 }:{
   staff:any[];compensation:any[];runs:any[];items:any[];advances:any[];
   live:boolean;canCorrect:boolean;
+  canManage?:boolean;operationsAllowed?:boolean;operationsReason?:string;
 }){
   const router=useRouter();
-  const [staffId,setStaffId]=useState(staff[0]?.id??"");
+  const [staffId,setStaffId]=useState(staff.find((s:any)=>s.active!==false&&!s.disabled_at)?.id??"");
   const current=compensation.find((x:any)=>x.staff_id===staffId);
   const [salaryType,setSalaryType]=useState(current?.salary_type??"monthly");
   const [basic,setBasic]=useState(Number(current?.basic_salary??0));
@@ -33,6 +34,8 @@ export default function PayrollManager({
   const [month,setMonth]=useState(new Date().toISOString().slice(0,7));
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
+  const inFlight=useRef(false);
+  const transactionDisabled=busy||!live||!canManage||!operationsAllowed;
 
   const unpaid=useMemo(()=>items.filter((x:any)=>x.payment_status==="unpaid"),[items]);
   const reversed=useMemo(()=>items.filter((x:any)=>x.payment_status==="void"),[items]);
@@ -40,7 +43,17 @@ export default function PayrollManager({
   const net=useMemo(()=>items.reduce((s:number,x:any)=>s+Number(x.net_pay||0),0),[items]);
   const openAdvances=useMemo(()=>advances.filter((x:any)=>x.status==="open").reduce((s:number,x:any)=>s+Number(x.remaining_amount??x.amount??0),0),[advances]);
   const configuredIds=useMemo(()=>new Set(compensation.map((x:any)=>x.staff_id)),[compensation]);
-  const missingSetup=useMemo(()=>staff.filter((s:any)=>!configuredIds.has(s.id)),[staff,configuredIds]);
+  const activeStaff=useMemo(()=>staff.filter((s:any)=>s.active!==false&&!s.disabled_at),[staff]);
+  const missingSetup=useMemo(()=>activeStaff.filter((s:any)=>!configuredIds.has(s.id)),[activeStaff,configuredIds]);
+  const paidTotal=useMemo(()=>items.filter((x:any)=>x.payment_status==="paid").reduce((s:number,x:any)=>s+Number(x.net_pay||0),0),[items]);
+
+  function permitted(transaction=true){
+    if(!live){setMessage("Payroll changes require a connected database.");return false;}
+    if(!canManage){setMessage("You do not have payroll management permission.");return false;}
+    if(transaction&&!operationsAllowed){setMessage(operationsReason);return false;}
+    if(inFlight.current)return false;
+    return true;
+  }
 
   function chooseStaff(id:string){
     setStaffId(id);
@@ -53,8 +66,9 @@ export default function PayrollManager({
     setNotes(c?.notes??"");
   }
 
-  async function call(name:string,args:Record<string,any>,success:string){
-    if(!live){setMessage(`Demo mode: ${success}`);return null;}
+  async function call(name:string,args:Record<string,any>,success:string,transaction=true){
+    if(!permitted(transaction))return null;
+    inFlight.current=true;
     setBusy(true);setMessage("");
     try{
       const supabase=createClient();
@@ -64,24 +78,26 @@ export default function PayrollManager({
       router.refresh();
       return data;
     }catch(e){
-      setMessage(e instanceof Error?e.message:"Payroll action failed.");
+      setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Payroll action failed.");
       return null;
-    }finally{setBusy(false);}
+    }finally{inFlight.current=false;setBusy(false);}
   }
 
   async function saveCompensation(){
-    if(!staffId||basic<0||allowances<0||deductions<0){
+    if(!permitted(false))return;
+    if(!activeStaff.some((s:any)=>s.id===staffId)||[basic,allowances,deductions].some(x=>!Number.isFinite(x)||x<0)||!effectiveFrom){
       setMessage("Select staff and enter valid non-negative salary values.");return;
     }
     await call("save_staff_compensation",{
       p_staff_id:staffId,p_salary_type:salaryType,p_basic_salary:basic,
       p_allowances:allowances,p_deductions:deductions,
       p_effective_from:effectiveFrom,p_notes:notes.trim()||null
-    },"Salary setup saved.");
+    },"Salary setup saved.",false);
   }
 
   async function saveAdvance(){
-    if(!staffId||advanceAmount<=0||!advanceReason.trim()){
+    if(!permitted())return;
+    if(!activeStaff.some((s:any)=>s.id===staffId)||!Number.isFinite(advanceAmount)||advanceAmount<=0||!advanceReason.trim()){
       setMessage("Select staff, enter a positive advance and a reason.");return;
     }
     const ok=await call("record_salary_advance",{
@@ -91,11 +107,13 @@ export default function PayrollManager({
   }
 
   async function generate(){
-    if(!month){setMessage("Choose the payroll month.");return;}
+    if(!permitted())return;
+    if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)){setMessage("Choose a valid payroll month.");return;}
     await call("generate_payroll_run",{p_payroll_month:`${month}-01`},`Payroll generated for ${month}.`);
   }
 
   async function editItem(item:any){
+    if(!permitted())return;
     if(item.payment_status!=="unpaid"){
       setMessage("Only unpaid salary items can be adjusted. Reverse and reopen a paid item first.");return;
     }
@@ -114,6 +132,7 @@ export default function PayrollManager({
   }
 
   async function pay(item:any){
+    if(!permitted())return;
     if(item.payment_status!=="unpaid")return;
     const method=window.prompt(
       "Payment method: cash, bank, mtn_momo or airtel_money","cash"
@@ -137,7 +156,9 @@ export default function PayrollManager({
   }
 
   async function reversePayment(item:any){
+    if(!permitted())return;
     if(!canCorrect){setMessage("You do not have payroll correction permission.");return;}
+    if(item.advance_history_ready===false){setMessage("Salary advance allocation history needs review before this payment can be reversed.");return;}
     const why=window.prompt("Reason for reversing this salary payment:");
     if(!why?.trim())return;
     if(!window.confirm(
@@ -149,6 +170,7 @@ export default function PayrollManager({
   }
 
   async function restorePayment(item:any){
+    if(!permitted())return;
     if(!canCorrect){setMessage("You do not have payroll correction permission.");return;}
     const why=window.prompt("Reason for restoring this reversed salary payment:");
     if(!why?.trim())return;
@@ -158,6 +180,7 @@ export default function PayrollManager({
   }
 
   async function reopenItem(item:any){
+    if(!permitted())return;
     if(!canCorrect){setMessage("You do not have payroll correction permission.");return;}
     const why=window.prompt("Why are you reopening this reversed salary for correction?");
     if(!why?.trim())return;
@@ -178,6 +201,8 @@ export default function PayrollManager({
     </div>
 
     {message&&<div className="hero" style={{padding:14}}><b>{message}</b></div>}
+    {live&&!operationsAllowed&&<div className="hero" style={{padding:14}}><b>Payroll transactions locked</b><p>{operationsReason}</p><p>Salary setup can be prepared by authorized staff. Advances, payroll generation, adjustments, payments and reversals remain disabled.</p></div>}
+    {live&&!canManage&&<p>You have read access. Payroll changes require management permission.</p>}
 
     <div className="grid4">
       <div className="card stat"><div className="label">Salary Setups</div><div className="value">{compensation.length}/{staff.length}</div></div>
@@ -185,6 +210,7 @@ export default function PayrollManager({
       <div className="card stat"><div className="label">Loaded Net Pay</div><div className="value">{ugx(net)}</div></div>
       <div className="card stat"><div className="label">Open Advances</div><div className="value">{ugx(openAdvances)}</div></div>
     </div>
+    <p style={{color:"var(--muted)",fontSize:12}}>Totals cover all loaded payroll months. Active salary payments: <b>{ugx(paidTotal)}</b>. Reversed payments contribute UGX 0 to this paid total.</p>
 
     {missingSetup.length>0&&<div className="hero" style={{marginTop:16}}>
       <h2>Salary setup still required</h2>
@@ -201,7 +227,7 @@ export default function PayrollManager({
           <label>Staff member</label>
           <select value={staffId} onChange={e=>chooseStaff(e.target.value)}>
             <option value="">Select staff</option>
-            {staff.map((s:any)=><option key={s.id} value={s.id}>{s.full_name} • {roleLabels[s.role]??s.role}</option>)}
+            {activeStaff.map((s:any)=><option key={s.id} value={s.id}>{s.full_name} • {roleLabels[s.role]??s.role}</option>)}
           </select>
         </div>
         <div className="grid2">
@@ -216,16 +242,16 @@ export default function PayrollManager({
           <div className="field"><label>Effective from</label><input type="date" value={effectiveFrom} onChange={e=>setEffectiveFrom(e.target.value)}/></div>
           <div className="field"><label>Notes</label><input value={notes} onChange={e=>setNotes(e.target.value)}/></div>
         </div>
-        <button className="btn primary" disabled={busy||!staffId} onClick={saveCompensation}>Save Salary Setup</button>
+        <button className="btn primary" disabled={busy||!live||!canManage||!staffId} onClick={saveCompensation}>Save Salary Setup</button>
       </div>
 
       <div className="card">
         <h3 style={{color:"var(--brown)",marginTop:0}}>Salary Advance</h3>
         <p style={{color:"var(--muted)"}}>Advances remain open until deducted through payroll.</p>
-        <div className="field"><label>Staff member</label><select value={staffId} onChange={e=>chooseStaff(e.target.value)}><option value="">Select staff</option>{staff.map((s:any)=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></div>
+        <div className="field"><label>Staff member</label><select value={staffId} onChange={e=>chooseStaff(e.target.value)}><option value="">Select staff</option>{activeStaff.map((s:any)=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></div>
         <div className="field"><label>Advance amount</label><input type="number" min="0" value={advanceAmount} onChange={e=>setAdvanceAmount(Number(e.target.value))}/></div>
         <div className="field"><label>Reason</label><input value={advanceReason} onChange={e=>setAdvanceReason(e.target.value)} placeholder="Emergency advance / transport / other"/></div>
-        <button className="btn secondary" disabled={busy||!staffId} onClick={saveAdvance}>Record Advance</button>
+        <button className="btn secondary" disabled={transactionDisabled||!staffId} onClick={saveAdvance}>Record Advance</button>
         <div style={{marginTop:16,maxHeight:230,overflow:"auto"}}>
           {advances.length===0?<p style={{color:"var(--muted)"}}>No salary advances recorded.</p>:advances.slice(0,20).map((a:any)=>{
             const s=staff.find((x:any)=>x.id===a.staff_id);
@@ -253,7 +279,7 @@ export default function PayrollManager({
             <label>Payroll month</label>
             <input type="month" value={month} onChange={e=>setMonth(e.target.value)}/>
           </div>
-          <button className="btn primary" disabled={busy||compensation.length===0} onClick={generate}>Generate Payroll</button>
+          <button className="btn primary" disabled={transactionDisabled||compensation.length===0} onClick={generate}>Generate Payroll</button>
         </div>
       </div>
     </div>
@@ -280,6 +306,7 @@ export default function PayrollManager({
             <td>{ugx(Number(i.advance_deduction))}</td>
             <td><b>{ugx(Number(i.net_pay))}</b></td>
             <td>
+              Paid: {ugx(i.payment_status==="paid"?Number(i.net_pay||0):0)}<br/>
               {i.payment_status==="paid"
                 ?<span className="badge green">PAID</span>
                 :i.payment_status==="void"
@@ -295,15 +322,16 @@ export default function PayrollManager({
             <td>
               <div className="action-row">
                 {i.payment_status==="unpaid"&&<>
-                  <button className="btn secondary" disabled={busy} onClick={()=>editItem(i)}>Adjust</button>
-                  <button className="btn primary" disabled={busy} onClick={()=>pay(i)}>Pay Salary</button>
+                  <button className="btn secondary" disabled={transactionDisabled} onClick={()=>editItem(i)}>Adjust</button>
+                  <button className="btn primary" disabled={transactionDisabled} onClick={()=>pay(i)}>Pay Salary</button>
                 </>}
-                {i.payment_status==="paid"&&canCorrect&&
-                  <button className="btn secondary" disabled={busy} onClick={()=>reversePayment(i)}>Reverse</button>}
-                {i.payment_status==="void"&&canCorrect&&<>
-                  <button className="btn primary" disabled={busy} onClick={()=>restorePayment(i)}>Restore</button>
-                  <button className="btn secondary" disabled={busy} onClick={()=>reopenItem(i)}>Reopen for Correction</button>
+                {i.payment_status==="paid"&&canManage&&canCorrect&&
+                  <button className="btn secondary" disabled={transactionDisabled||i.advance_history_ready===false} onClick={()=>reversePayment(i)}>Reverse</button>}
+                {i.payment_status==="void"&&canManage&&canCorrect&&<>
+                  <button className="btn primary" disabled={transactionDisabled} onClick={()=>restorePayment(i)}>Restore</button>
+                  <button className="btn secondary" disabled={transactionDisabled} onClick={()=>reopenItem(i)}>Reopen for Correction</button>
                 </>}
+                {i.payment_status==="paid"&&i.advance_history_ready===false&&<small>Advance allocation history needs review before reversal.</small>}
               </div>
             </td>
           </tr>)}
