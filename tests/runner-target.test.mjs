@@ -6,7 +6,7 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {payloadFiles,sha256} from '../recovery/archive.mjs';
-import {RunnerTarget,requireHostedRunner,validateIsolatedContainer,targetPsqlArgs} from '../recovery/cloud/runner_target.mjs';
+import {RunnerTarget,requireHostedRunner,validateIsolatedContainer,targetPsqlArgs,isolatedEntrypoint} from '../recovery/cloud/runner_target.mjs';
 
 const id='c'.repeat(64),runId='d'.repeat(64),imageId='sha256:'+'a'.repeat(64),volume='supabase_db_ds_bakery_recovery_'+runId.slice(0,16);
 const proof={container_id:id,run_id:runId,image_id:imageId,source_image:'public.ecr.aws/supabase/postgres:17.11.0.002',volume_name:volume};
@@ -27,6 +27,10 @@ test('runner target rejects laptop/cloud target strings and every weakened isola
   ]) {const changed=container();weaken(changed);assert.throws(()=>validateIsolatedContainer(changed,proof));}
   assert.throws(()=>targetPsqlArgs('sgmmiymjnqqorvtvpigw'));
   const args=targetPsqlArgs(id);assert(args.includes(id));assert(!args.includes('--host'));assert(!args.some(value=>value.includes('supabase.co')));
+  const entry=['sh','-c','docker-entrypoint.sh postgres -D /etc/postgresql \n'];
+  assert(isolatedEntrypoint(entry)[2].includes('-c cron.launch_active_jobs=off'));
+  assert.throws(()=>isolatedEntrypoint(['sh','-c','other-postgres-command']));
+  assert.throws(()=>isolatedEntrypoint(['sh','-c',entry[2]+entry[2]]));
 });
 
 test('runner restore refuses occupied targets and failed imports, and compares actual restored money',async()=>{
@@ -44,6 +48,7 @@ test('runner restore refuses occupied targets and failed imports, and compares a
       this.commands.push({program,args,input:options.input});
       if(args.includes('--single-transaction')&&this.failImport) throw Error('Test-only import failure');
       if(options.input?.includes('public_objects')) return {status:0,stdout:JSON.stringify({public_objects:this.occupied?1:0,auth_users:0,postgres_major:17})};
+      if(options.input?.includes("current_setting('cron.launch_active_jobs'")) return {status:0,stdout:'off\n'};
       if(options.input?.includes('recovery_verification_manifest')) return {status:0,stdout:JSON.stringify(this.restored)};
       return {status:0,stdout:''};
     }
@@ -87,7 +92,7 @@ test('mock bootstrap creates only a fresh isolated target, strips source secrets
       if(program==='supabase') {
         if(args[0]==='init') {const directory=path.join(this.workspace,'supabase');fs.mkdirSync(directory);fs.writeFileSync(path.join(directory,'config.toml'),'project_id = "test"\n[db]\nmajor_version = 15\n');}
         else if(args[0]==='db'&&args[1]==='start'&&!args.includes('--help')) {
-          const bootstrap={Id:'b'.repeat(64),Image:imageId,Name:'/'+this.bootstrapName,Config:{Image:proof.source_image,Env:['POSTGRES_PASSWORD=local-only'],Entrypoint:['sh','-c','docker-entrypoint.sh postgres'],Cmd:[]},Mounts:[{Type:'volume',Name:this.volumeName,Destination:'/var/lib/postgresql/data'}]};
+          const bootstrap={Id:'b'.repeat(64),Image:imageId,Name:'/'+this.bootstrapName,Config:{Image:proof.source_image,Env:['POSTGRES_PASSWORD=local-only'],Entrypoint:['sh','-c','docker-entrypoint.sh postgres -D /etc/postgresql'],Cmd:[]},Mounts:[{Type:'volume',Name:this.volumeName,Destination:'/var/lib/postgresql/data'}]};
           this.resources.set(this.bootstrapName,bootstrap);this.resources.set(bootstrap.Id,bootstrap);this.volumeExists=true;
         }
         return success();
@@ -102,6 +107,7 @@ test('mock bootstrap creates only a fresh isolated target, strips source secrets
       if(args[0]==='exec'&&args.includes('psql')) {
         if(options.input==='select 1;') return success('1\n');
         if(options.input?.includes('public_objects')) return success('{"public_objects":0,"auth_users":0,"postgres_major":17}\n');
+        if(options.input?.includes("current_setting('cron.launch_active_jobs'")) return success('off\n');
         return success('');
       }
       if(args[0]==='rm') {const value=this.resources.get(args.at(-1));if(value){this.resources.delete(value.Id);this.resources.delete(value.Name.slice(1));}return success();}
@@ -115,6 +121,7 @@ test('mock bootstrap creates only a fresh isolated target, strips source secrets
     await target.create();target.assertIsolated();
     assert(target.commands.some(c=>c.program==='supabase'&&c.args.join(' ')==='db start --help'));
     assert(target.commands.some(c=>c.program==='docker'&&c.args.includes('create')&&c.args.includes(imageId)));
+    assert(target.commands.some(c=>c.program==='docker'&&c.args[0]==='create'&&c.args.some(a=>a.includes('-c cron.launch_active_jobs=off'))));
     assert(!target.commands.some(c=>c.args.some(a=>a.includes('TEST-ONLY-SENSITIVE'))));
     const config=fs.readFileSync(path.join(target.workspace,'supabase','config.toml'),'utf8');assert(config.includes('major_version = 17'));assert(config.includes(target.project));
     target.cleanup();assert.equal(target.resources.size,0);assert.equal(target.volumeExists,false);

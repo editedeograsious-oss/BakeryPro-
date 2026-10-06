@@ -35,6 +35,14 @@ export function targetPsqlArgs(id,args=[]) {
   return ['exec','-i','--user','postgres',id,'psql','--no-psqlrc','--quiet','--variable','ON_ERROR_STOP=1','--username','postgres','--dbname','postgres',...args];
 }
 
+export function isolatedEntrypoint(entry) {
+  const command=/^docker-entrypoint\.sh postgres -D \/etc\/postgresql[^\n]*$/gm;
+  if(entry?.length!==3||entry[0]!=='sh'||entry[1]!=='-c'||typeof entry[2]!=='string'||[...entry[2].matchAll(command)].length!==1) throw Error('Unexpected bootstrap entrypoint');
+  // Supabase's postgres role cannot ALTER SYSTEM for this setting. Set it on
+  // the server command line, before readiness, rather than changing role grants.
+  return [entry[0],entry[1],entry[2].replace(command,line=>line+' -c cron.launch_active_jobs=off')];
+}
+
 export class RunnerTarget {
   constructor(work,logfd,environment) {
     requireHostedRunner(environment);
@@ -85,8 +93,7 @@ export class RunnerTarget {
       '--label',label+'='+this.runId,'--label','ds-bakery.recovery.kind=isolated-restore',
       '--mount','type=volume,source='+this.volumeName+',target=/var/lib/postgresql/data'];
     for(const value of initial.Config.Env||[]) args.push('--env',value);
-    const entry=initial.Config.Entrypoint||[];
-    if(!entry.length||entry[0]!=='sh') throw Error('Unexpected bootstrap entrypoint');
+    const entry=isolatedEntrypoint(initial.Config.Entrypoint);
     args.push('--entrypoint',entry[0],initial.Image,...entry.slice(1),...(initial.Config.Cmd||[]));
     const id=this.call('docker',args,{capture:true}).stdout.trim();
     if(!hashPattern.test(id)) throw Error('Invalid created container identity');
@@ -102,8 +109,7 @@ export class RunnerTarget {
     if(!ready) throw Error('Disposable PostgreSQL did not become ready');
     this.assertIsolated();
     fs.writeFileSync(path.join(this.work,'runner_target_proof.json'),JSON.stringify(this.proof,null,2)+'\n',{mode:0o600});
-    // Stop scheduled jobs if the image exposes that setting. No external route exists either way.
-    this.psql("select 'ALTER SYSTEM SET cron.launch_active_jobs = off' where exists(select 1 from pg_settings where name='cron.launch_active_jobs');\n\\gexec\nselect pg_reload_conf();\n");
+    if(this.psql("select current_setting('cron.launch_active_jobs', true);").trim()!=='off') throw Error('Scheduled jobs are not disabled in the disposable target');
     this.call('docker',['rm',initial.Id]);this.bootstrapId=null;
     return this;
   }
@@ -114,6 +120,7 @@ export class RunnerTarget {
     if(!/^[a-f0-9]{64}$/.test(expected)||expected!==await sha256(archive)) throw Error('Archive hash mismatch');
     const state=JSON.parse(this.psql(emptyTargetSql));
     if(state.public_objects!==0||state.auth_users!==0||state.postgres_major!==17) throw Error('Restore target is not empty');
+    if(this.psql("select current_setting('cron.launch_active_jobs', true);").trim()!=='off') throw Error('Scheduled jobs are not disabled in the disposable target');
     // CLI bootstrap can create an empty migration-history schema. Refuse nonempty history.
     this.psql("DO $$DECLARE occupied boolean; BEGIN IF to_regclass('supabase_migrations.schema_migrations') IS NOT NULL THEN EXECUTE 'SELECT EXISTS(SELECT 1 FROM supabase_migrations.schema_migrations)' INTO occupied; IF occupied THEN RAISE EXCEPTION 'Target migration history is not empty'; END IF; END IF; END$$;\nDROP SCHEMA IF EXISTS supabase_migrations CASCADE;\nALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated, service_role;\nALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated, service_role;\nALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon, authenticated, service_role;\n");
     const importDir='/tmp/ds-bakery-import';
