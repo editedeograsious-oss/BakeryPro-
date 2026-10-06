@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ugx } from "@/lib/costing";
@@ -23,11 +23,18 @@ export default function SupplierAccountsPanel({
   const requestId=useRef(crypto.randomUUID());
 
   const current=accounts.find((a:any)=>a.supplier_id===supplierId);
-  const currentPurchase=payables.find((p:any)=>p.id===purchaseId);
+  const currentPurchase=payables.find((p:any)=>p.id===purchaseId&&p.supplier_id===supplierId);
   const supplierPayables=payables.filter((p:any)=>p.supplier_id===supplierId);
   const supplierStatement=statements.filter((s:any)=>s.supplier_id===supplierId).slice(0,50);
   const totalBalance=useMemo(()=>accounts.reduce((s:number,a:any)=>s+Number(a.outstanding_balance||0),0),[accounts]);
   const overdue=useMemo(()=>accounts.reduce((s:number,a:any)=>s+Number(a.overdue_balance||0),0),[accounts]);
+
+  useEffect(()=>{
+    if(!payables.some((p:any)=>p.id===purchaseId&&p.supplier_id===supplierId)){
+      setPurchaseId(payables.find((p:any)=>p.supplier_id===supplierId)?.id??"");
+      setAmount(0);
+    }
+  },[payables,purchaseId,supplierId]);
 
   function chooseSupplier(id:string){
     setSupplierId(id);
@@ -38,8 +45,8 @@ export default function SupplierAccountsPanel({
 
   async function pay(){
     if(!operationsAllowed){setMessage(operationsReason);return;}
-    if(!purchaseId){setMessage("Select an outstanding purchase.");return;}
-    if(amount<=0){setMessage("Payment amount must be greater than zero.");return;}
+    if(!currentPurchase){setMessage("Select an outstanding purchase for this supplier.");return;}
+    if(!Number.isFinite(amount)||amount<=0){setMessage("Payment amount must be greater than zero.");return;}
     if(currentPurchase&&amount>Number(currentPurchase.outstanding_amount)){setMessage("Payment exceeds the selected purchase balance.");return;}
     if(method!=="cash"&&!reference.trim()){setMessage("Enter a reference for bank/Mobile Money payment.");return;}
     if(!live){setMessage("Demo mode: supplier payment simulated.");return;}
@@ -51,7 +58,7 @@ export default function SupplierAccountsPanel({
         p_amount:amount,
         p_method:method,
         p_reference:reference.trim()||null,
-        p_shift_id:shiftId||null,
+        p_shift_id:method==="cash"?(shiftId||null):null,
         p_client_request_id:requestId.current,
       });
       if(error)throw error;
@@ -137,13 +144,14 @@ export default function SupplierAccountsPanel({
 
     <div className="card" style={{marginTop:16}}>
       <h3 style={{color:"var(--brown)",marginTop:0}}>{current?.supplier_name??"Supplier"} — Statement</h3>
+      <p style={{color:"var(--muted)"}}>Latest {supplierStatement.length} statement lines, newest first. Each balance includes earlier transactions for this supplier.</p>
       <div className="tablewrap"><table>
         <thead><tr><th>Date</th><th>Reference</th><th>Debit</th><th>Credit</th><th>Balance</th><th>Status</th></tr></thead>
         <tbody>{supplierStatement.length===0?<tr><td colSpan={6}>No statement lines.</td></tr>:supplierStatement.map((s:any)=><tr key={`${s.line_type}-${s.source_id}`}>
           <td>{new Date(s.occurred_at).toLocaleDateString()}</td>
           <td>{s.reference}{s.supplier_invoice_no&&<><br/><span style={{fontSize:12,color:"var(--muted)"}}>Invoice: {s.supplier_invoice_no}</span></>}</td>
           <td>{Number(s.debit||0)>0?ugx(Number(s.debit)):"—"}</td>
-          <td>{Number(s.credit||0)>0?ugx(Number(s.credit)):"—"}</td>
+          <td>{s.voided_at?<><b>{ugx(0)}</b><br/><span style={{fontSize:12,color:"var(--muted)"}}>Original: {ugx(Number(s.original_amount??0))}</span></>:Number(s.credit||0)>0?ugx(Number(s.credit)):"—"}</td>
           <td><b>{ugx(Number(s.running_balance||0))}</b></td>
           <td>{s.voided_at?<span className="badge red">VOIDED</span>:s.edited_at?<span className="badge gold">EDITED</span>:<span className="badge green">ACTIVE</span>}</td>
         </tr>)}</tbody>

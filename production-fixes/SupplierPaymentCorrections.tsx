@@ -1,19 +1,22 @@
 'use client';
 
-import { useEffect,useState } from "react";
+import { useCallback,useEffect,useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ugx } from "@/lib/costing";
 
 export default function SupplierPaymentCorrections({
-  live,canCorrect,operationsAllowed,operationsReason
+  live,canCorrect,operationsAllowed,operationsReason,refreshKey=""
 }:{
   live:boolean;canCorrect:boolean;operationsAllowed:boolean;operationsReason:string;
+  refreshKey?:string;
 }){
+  const router=useRouter();
   const [rows,setRows]=useState<any[]>([]);
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
 
-  async function load(){
+  const load=useCallback(async()=>{
     if(!live)return;
     const supabase=createClient();
     const {data,error}=await supabase
@@ -23,8 +26,8 @@ export default function SupplierPaymentCorrections({
       .limit(100);
     if(error){setMessage(error.message);return;}
     setRows(data??[]);
-  }
-  useEffect(()=>{void load();},[live]);
+  },[live]);
+  useEffect(()=>{void load();},[load,refreshKey]);
 
   function guard(){
     if(!canCorrect){setMessage("You do not have correction permission.");return false;}
@@ -54,6 +57,7 @@ export default function SupplierPaymentCorrections({
       if(error)throw error;
       setMessage("Supplier payment corrected.");
       await load();
+      router.refresh();
     }catch(e){setMessage(e instanceof Error?e.message:"Could not correct supplier payment.");}
     finally{setBusy(false);}
   }
@@ -71,6 +75,7 @@ export default function SupplierPaymentCorrections({
       if(error)throw error;
       setMessage("Supplier payment voided and purchase balance recalculated.");
       await load();
+      router.refresh();
     }catch(e){setMessage(e instanceof Error?e.message:"Could not void supplier payment.");}
     finally{setBusy(false);}
   }
@@ -87,6 +92,7 @@ export default function SupplierPaymentCorrections({
       if(error)throw error;
       setMessage("Supplier payment restored.");
       await load();
+      router.refresh();
     }catch(e){setMessage(e instanceof Error?e.message:"Could not restore supplier payment.");}
     finally{setBusy(false);}
   }
@@ -98,12 +104,12 @@ export default function SupplierPaymentCorrections({
     {message&&<div className="hero" style={{padding:12}}><b>{message}</b></div>}
 
     <div className="tablewrap"><table>
-      <thead><tr><th>Date</th><th>Supplier</th><th>Purchase</th><th>Amount</th><th>Method</th><th>Reference</th><th>Status</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Date</th><th>Supplier</th><th>Purchase</th><th>Effective Amount</th><th>Method</th><th>Reference</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>{rows.length===0?<tr><td colSpan={8}>No supplier payments found.</td></tr>:rows.map((r:any)=><tr key={r.id}>
         <td>{new Date(r.paid_at).toLocaleString()}</td>
         <td>{r.purchases?.suppliers?.name??"—"}</td>
         <td>{r.purchases?.purchase_no??"—"}</td>
-        <td><b>{ugx(Number(r.voided_at?(r.voided_original_amount??0):r.amount))}</b></td>
+        <td><b>{ugx(Number(r.voided_at?0:r.amount))}</b>{r.voided_at&&<><br/><span style={{fontSize:12,color:"var(--muted)"}}>Original: {ugx(Number(r.voided_original_amount??0))}</span></>}</td>
         <td>{String(r.method??"").replaceAll("_"," ")}</td>
         <td>{r.reference??"—"}</td>
         <td>{r.voided_at?<span className="badge red">VOIDED</span>:r.edited_at?<span className="badge gold">EDITED</span>:<span className="badge green">ACTIVE</span>}</td>

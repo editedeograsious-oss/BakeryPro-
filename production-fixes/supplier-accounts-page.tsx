@@ -41,6 +41,7 @@ export default async function SupplierAccounts(){
       canCorrect={canCorrect}
       operationsAllowed={operationsAllowed}
       operationsReason={operationsReason}
+      refreshKey={JSON.stringify(data.statements.map((s:any)=>[s.source_id,s.credit,s.edited_at,s.voided_at]))}
     />
   </main></div>;
 }

@@ -5,20 +5,33 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ugx } from "@/lib/costing";
 
-export default function PurchaseReceivingPanel({lines,history=[],live}:{lines:any[];history?:any[];live:boolean}){
+export default function PurchaseReceivingPanel({lines,history=[],live,operationsAllowed=false,operationsReason="Business operation status is unavailable"}:{lines:any[];history?:any[];live:boolean;operationsAllowed?:boolean;operationsReason?:string}){
   const router=useRouter();
   const [quantities,setQuantities]=useState<Record<string,number>>({});
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
   const requests=useRef<Record<string,string>>({});
 
-  const totalOrdered=useMemo(()=>history.reduce((s:number,l:any)=>s+Number(l.ordered_qty_base||0),0),[history]);
-  const totalReceived=useMemo(()=>history.reduce((s:number,l:any)=>s+Number(l.received_qty_base||0),0),[history]);
-  const totalRemaining=useMemo(()=>history.reduce((s:number,l:any)=>s+Number(l.remaining_qty_base||0),0),[history]);
+  const totalsByUnit=useMemo(()=>{
+    const totals=new Map<string,{ordered:number;received:number;remaining:number}>();
+    for(const line of history){
+      const unit=line.base_unit??"unit";
+      const total=totals.get(unit)??{ordered:0,received:0,remaining:0};
+      total.ordered+=Number(line.ordered_qty_base||0);
+      total.received+=Number(line.received_qty_base||0);
+      total.remaining+=Number(line.remaining_qty_base||0);
+      totals.set(unit,total);
+    }
+    return Array.from(totals.entries());
+  },[history]);
+  function quantityTotal(field:"ordered"|"received"|"remaining"){
+    return totalsByUnit.length?totalsByUnit.map(([unit,total])=><div key={unit}>{total[field].toLocaleString()} {unit}</div>):"0";
+  }
 
   async function receive(line:any){
+    if(!operationsAllowed){setMessage(operationsReason);return;}
     const qty=Number(quantities[line.id]??0);
-    if(qty<=0){setMessage("Enter a positive received quantity.");return;}
+    if(!Number.isFinite(qty)||qty<=0){setMessage("Enter a positive received quantity.");return;}
     if(qty>Number(line.remaining_qty_base)){setMessage("Received quantity cannot exceed the remaining ordered quantity.");return;}
     if(!live){setMessage("Demo mode: stock receipt simulated.");return;}
 
@@ -51,13 +64,14 @@ export default function PurchaseReceivingPanel({lines,history=[],live}:{lines:an
       </div>
     </div>
 
-    {message&&<div className="hero" style={{padding:14}}><b>{message}</b></div>}
+    {!operationsAllowed&&<div className="hero" style={{padding:14}}><b>Live operations are locked.</b><div style={{marginTop:4}}>{operationsReason}</div></div>}
+    {message&&<div className="hero" role="status" style={{padding:14}}><b>{message}</b></div>}
 
     <div className="grid4">
       <div className="card stat"><div className="label">Awaiting Lines</div><div className="value">{lines.length}</div></div>
-      <div className="card stat"><div className="label">Ordered Qty</div><div className="value">{totalOrdered.toLocaleString()}</div></div>
-      <div className="card stat"><div className="label">Received Qty</div><div className="value">{totalReceived.toLocaleString()}</div></div>
-      <div className="card stat"><div className="label">Remaining Qty</div><div className="value">{totalRemaining.toLocaleString()}</div></div>
+      <div className="card stat"><div className="label">Ordered Qty</div><div className="value">{quantityTotal("ordered")}</div></div>
+      <div className="card stat"><div className="label">Received Qty</div><div className="value">{quantityTotal("received")}</div></div>
+      <div className="card stat"><div className="label">Remaining Qty</div><div className="value">{quantityTotal("remaining")}</div></div>
     </div>
 
     <div className="card" style={{marginTop:16}}>
@@ -69,14 +83,14 @@ export default function PurchaseReceivingPanel({lines,history=[],live}:{lines:an
           <td>{Number(l.received_qty_base).toLocaleString()} {l.base_unit}</td>
           <td><b>{Number(l.remaining_qty_base).toLocaleString()} {l.base_unit}</b></td>
           <td>{ugx(Number(l.unit_cost_base))}/{l.base_unit}</td>
-          <td><div style={{display:"flex",gap:6,minWidth:190}}><input type="number" min="0.000001" step="any" style={{maxWidth:105}} value={quantities[l.id]??0} onChange={e=>setQuantities(prev=>({...prev,[l.id]:Number(e.target.value)}))}/><button className="btn primary" disabled={busy} onClick={()=>receive(l)}>Receive</button></div></td>
+          <td><div style={{display:"flex",gap:6,minWidth:190}}><input type="number" min="0.000001" max={Number(l.remaining_qty_base)} step="any" aria-label={`Receive quantity for ${l.material_name} on ${l.purchase_no}`} disabled={busy||!operationsAllowed} style={{maxWidth:105}} value={quantities[l.id]??0} onChange={e=>setQuantities(prev=>({...prev,[l.id]:Number(e.target.value)}))}/><button className="btn primary" disabled={busy||!operationsAllowed} onClick={()=>receive(l)}>Receive</button></div></td>
         </tr>)}</tbody>
       </table></div>
     </div>
 
     <div className="card" style={{marginTop:16}}>
       <h3 style={{color:"var(--brown)",marginTop:0}}>Purchase Receipt History</h3>
-      <p style={{color:"var(--muted)"}}>Fully received purchases remain visible here instead of disappearing when their remaining quantity reaches zero.</p>
+      <p style={{color:"var(--muted)"}}>Recent approved purchase lines, including fully received purchases. Quantity totals are grouped by unit.</p>
       <div className="tablewrap"><table>
         <thead><tr><th>PO</th><th>Supplier</th><th>Material</th><th>Ordered</th><th>Received</th><th>Remaining</th><th>Line Value</th><th>Status</th></tr></thead>
         <tbody>{history.length===0?<tr><td colSpan={8}>No purchase receipt history found.</td></tr>:history.map(l=><tr key={l.id}>
