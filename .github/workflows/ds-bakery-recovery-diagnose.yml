@@ -1,0 +1,35 @@
+# Read-only diagnosis of one authenticated failed staging archive.
+name: DS Bakery private recovery diagnosis
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  diagnosis:
+    if: github.repository == 'editedeograsious-oss/BakeryPro-' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the tested private diagnosis tools
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 40b991accae2e8aa6dfca3a9b7f2ace28bb8ccc6
+          persist-credentials: false
+      - name: Download only the encrypted failed staging artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          artifact-ids: '11432668083'
+          run-id: '37506992524'
+          repository: editedeograsious-oss/BakeryPro-
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/ds-bakery-diagnosis-input
+          merge-multiple: true
+      - name: Report only safe restore error categories
+        env:
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BAKERY_BACKUP_PASSPHRASE }}
+          DIAGNOSIS_INPUT_DIR: ${{ runner.temp }}/ds-bakery-diagnosis-input
+          DIAGNOSIS_BUNDLE_SHA256: 07c394ac85cd97579d957b12855bdce2e09f29e6dca6691d81d4d6b51bfecf53
+          DIAGNOSIS_ARCHIVE_SHA256: 0d163cf494500f01e96bdd12ee1ad36a1c4c37ad7c4bc3404d58cac66889c826
+          DIAGNOSIS_CODE_SHA: 07e3a98f9cecb4a75c7745bf6bfc809707e2a243
+        run: node recovery/cloud/diagnose.mjs
