@@ -257,14 +257,14 @@
   "full_service_recovery_validated": false,
   "pending_private_review": [
     "Independent verification of owner-reported saved Auth URLs and recovery behavior",
-    "Auth providers, email confirmation/recovery configuration, SMTP settings and templates",
+    "Auth providers, email recovery behavior, templates and delivery path; custom SMTP observed disabled",
     "Separate private retention of backup passphrase, API/function/deployment secret values",
     "Actual Supabase provider-backup availability and retention",
     "External jobs, webhooks, payment integrations and other service configuration"
   ],
   "final_cutover_approved": false,
   "auth_configuration_review": {
-    "status": "owner_reported_url_update_not_independently_verified",
+    "status": "urls_reported_saved_custom_smtp_disabled_email_delivery_unverified",
     "reported_saved_at": "2026-10-07T00:32:46+03:00",
     "previous_site_url_reported": "http://localhost:3000",
     "site_url_reported_saved": "https://ds-bakery-web-production.up.railway.app",
@@ -272,6 +272,16 @@
     "evidence_source": "Owner confirmation in chat: URLs saved",
     "independent_dashboard_readback": false,
     "email_delivery_tested": false,
-    "smtp_status": "not_yet_reviewed"
+    "smtp_status": "disabled",
+    "custom_smtp_enabled": false,
+    "smtp_evidence": {
+      "source": "Owner-provided production Supabase SMTP screenshot",
+      "observed_at": "2026-10-07T00:38:31+03:00",
+      "project_ref": "sgmmiymjnqqorvtvpigw",
+      "custom_smtp_enabled": false,
+      "email_delivery_tested": false
+    },
+    "staff_account_creation_requires_email_delivery": false,
+    "staff_account_creation_evidence": "Captured deployed create-staff-account source uses Auth admin createUser with email_confirm=true, without inviteUserByEmail."
   }
 }
