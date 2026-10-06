@@ -1,0 +1,43 @@
+# No bakery connections or secrets are supplied to this readiness job.
+name: DS Bakery temporary recovery runner check
+on:
+  push:
+    branches: [ds-bakery-recovery-runner-preflight]
+    paths:
+      - 'recovery/**'
+      - 'tests/*recovery*.test.mjs'
+      - 'tests/runner-target.test.mjs'
+      - '.github/workflows/ds-bakery-runner-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ds-bakery-runner-preflight
+  cancel-in-progress: false
+jobs:
+  runner-readiness:
+    if: github.repository == 'editedeograsious-oss/BakeryPro-' && github.ref == 'refs/heads/ds-bakery-recovery-runner-preflight'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out recovery tools without stored credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Run recovery safety checks
+        run: node --test tests/recovery-tools.test.mjs tests/cloud-recovery.test.mjs tests/runner-target.test.mjs
+      - name: Install the pinned Supabase CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker info >/dev/null
+          tool_archive="$RUNNER_TEMP/supabase-cli.tar.gz"
+          curl --fail --silent --show-error --location \
+            https://github.com/supabase/cli/releases/download/v2.119.0/supabase_2.119.0_linux_amd64.tar.gz \
+            --output "$tool_archive"
+          printf '%s  %s\n' bf1c3ae93be98533eb8a3105dbf4564bd0b2d9dc24690d8a920f980ef975c1b4 "$tool_archive" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/bakery-tools"
+          tar -xzf "$tool_archive" -C "$RUNNER_TEMP/bakery-tools" supabase
+          echo "$RUNNER_TEMP/bakery-tools" >> "$GITHUB_PATH"
+      - name: Check the empty isolated database with test-only SQL
+        run: node recovery/cloud/runner_preflight.mjs

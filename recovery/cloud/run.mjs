@@ -6,6 +6,7 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {checkPassphrase,encryptBundle} from './encrypted_bundle.mjs';
 import {validateSource,validateTarget} from '../connection_guard.mjs';
 import {sha256} from '../archive.mjs';
+import {RunnerTarget,requireHostedRunner} from './runner_target.mjs';
 
 const recoveryRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const repo=path.dirname(recoveryRoot),staging='kymadepeuqhcsjwbrgqq';
@@ -16,7 +17,10 @@ export async function runCloudRecovery(environment=process.env) {
   checkPassphrase(environment.BACKUP_ENCRYPTION_PASSPHRASE);
   if(environment.SOURCE_PROJECT_REF!==staging) throw Error('The first online recovery workflow requires staging');
   validateSource(environment.DATABASE_URL,staging);
-  validateTarget(environment.TARGET_DATABASE_URL,environment.TARGET_PROJECT_REF,staging);
+  const temporaryTarget=environment.RESTORE_TARGET_KIND==='runner-local';
+  if(temporaryTarget) requireHostedRunner(environment);
+  else if(environment.RESTORE_TARGET_KIND&&environment.RESTORE_TARGET_KIND!=='hosted') throw Error('Unknown restore target kind');
+  else validateTarget(environment.TARGET_DATABASE_URL,environment.TARGET_PROJECT_REF,staging);
   if(environment.RESTORE_CONFIRM!=='RESTORE_TO_TEST_ONLY'||environment.SOURCE_QUIET_CONFIRMED!=='true') throw Error('Restore and quiet-source checks are required');
   if(!environment.CLOUD_RECOVERY_ARTIFACT_DIR) throw Error('Choose an encrypted-artifact output directory');
   const base=path.resolve(environment.CLOUD_RECOVERY_TEMP_DIR||environment.RUNNER_TEMP||os.tmpdir());
@@ -29,15 +33,22 @@ export async function runCloudRecovery(environment=process.env) {
   const backups=path.join(work,'backups'),results=path.join(work,'restore');
   fs.mkdirSync(results,{mode:0o700});
   const env={...environment,BACKUP_DIR:backups,TMPDIR:results};
-  const summary={format_version:1,scope:'database_only',source_project_ref:staging,target_project_ref:environment.TARGET_PROJECT_REF,
+  const summary={format_version:1,scope:'database_only',source_project_ref:staging,target_kind:temporaryTarget?'runner-local':'hosted',target_project_ref:environment.TARGET_PROJECT_REF||null,
     status:'failed',stage:'backup',database_restore_compared:false,backup_label:null,archive_sha256:null,
     recovery_code_commit:environment.CLOUD_RECOVERY_CODE_SHA||null};
   const command=(program,args,timeout=20*60*1000)=>{
     const result=spawnSync(program,args,{env,stdio:['ignore',logfd,logfd],timeout});
     if(result.error||result.status!==0) throw Error('Recovery command did not complete successfully');
   };
+  let local=null;
   try {
     try {
+      if(temporaryTarget) {
+        summary.stage='temporary-target';
+        console.log('Preparing the isolated temporary restore database on this runner.');
+        local=new RunnerTarget(work,logfd,env);await local.create();
+      }
+      summary.stage='backup';
       console.log('Exporting staging. Detailed output stays in the encrypted bundle.');
       command('bash',[path.join(recoveryRoot,'backup.sh')]);
       const labels=fs.readdirSync(backups).filter(name=>/^ds_bakery_\d{8}T\d{6}Z_[A-Za-z0-9]+$/.test(name)&&fs.statSync(path.join(backups,name)).isDirectory());
@@ -47,9 +58,14 @@ export async function runCloudRecovery(environment=process.env) {
       summary.archive_sha256=await sha256(archive);
       summary.stage='restore';
       console.log('Comparing a restore in the separate empty target.');
-      command('bash',[path.join(recoveryRoot,'restore_test.sh'),folder,archive]);
+      if(local) await local.restore(folder,archive,staging);
+      else command('bash',[path.join(recoveryRoot,'restore_test.sh'),folder,archive]);
       summary.status='passed';summary.stage='complete';summary.database_restore_compared=true;
     } catch(error) {fs.writeSync(logfd,'\nCloud wrapper: '+String(error.stack)+'\n');}
+    if(local) {
+      try {local.cleanup();summary.temporary_target_removed=true;}
+      catch(error) {summary.status='failed';summary.stage='cleanup';summary.temporary_target_removed=false;fs.writeSync(logfd,'\nCleanup: '+String(error.stack)+'\n');}
+    }
     summary.completed_at=new Date().toISOString();
     fs.writeFileSync(path.join(work,'recovery_result.json'),JSON.stringify(summary,null,2)+'\n',{mode:0o600});
     // Everything produced by the database tools, including failure details, stays in this private bundle.

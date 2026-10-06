@@ -1,10 +1,14 @@
 # Online recovery drill
 
-The recovery tools can run on a GitHub-hosted Ubuntu machine. Docker/WSL do not need to be installed on the operator's laptop. The runner still needs a separate, empty Supabase restore project. Neither existing bakery project is allowed as a restore target.
+The recovery tools can run on a GitHub-hosted Ubuntu machine. Docker/WSL do not need to be installed on the operator's laptop. Neither existing bakery project is allowed as a restore target.
+
+The hosted restore-project route is blocked by the account's two-project free limit. Do not pause/delete either bakery project or upgrade billing to work around it. A disposable PostgreSQL 17 Supabase database on the GitHub-hosted runner is being checked instead. The local runner target accepts no hosted target URL, reuses only a freshly bootstrapped volume, has networking disabled and no published ports before any bakery import, and is removed after comparison. Its SQL runs through `docker exec` into the exact checked container ID.
+
+`runner-preflight-workflow.yml` runs only on the isolated `ds-bakery-recovery-runner-preflight` branch. It supplies no bakery credentials and checks the real empty database using fictional SQL. A successful readiness check is not a bakery backup, restore drill or launch-gate pass. Real staging export/restore remains pending until this route passes and private source/encryption secrets are configured.
 
 ## Prepared, not yet run
 
-The template is deliberately outside `.github/workflows`. No cloud job is activated by this change. A real database export, restore and passing evidence remain pending. The mock tests do not count as a real drill.
+The hosted recovery template is deliberately outside `.github/workflows`. The runner-readiness template may be installed on the isolated preflight branch; it cannot export either bakery database. A real database export, restore and passing evidence remain pending. The mock tests do not count as a real drill.
 
 After an organisation is selected, obtain its quoted project cost and any required billing approval before creating the empty restore target. Do not delete or reuse the existing staging/production databases to make room.
 
