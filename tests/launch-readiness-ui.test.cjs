@@ -46,7 +46,7 @@ const ready = { ...locked, database_gate: 'pass', operations_enabled: true, go_l
 assert.equal(helper.getReadinessDisplay(ready).launchLabel, 'READY');
 assert.equal(helper.getReadinessDisplay({ ...ready, database_checks: ready.database_checks.filter(c => c.check_key !== 'production_operations') }).launchLabel, 'PENDING', 'Incomplete launch evidence cannot display ready');
 
-async function pageMarkup(filename, launch, error = null) {
+async function pageMarkup(filename, launch, error = null, environment = 'production') {
   const page = load(filename, {
     'next/link': { default: ({ children, ...props }) => React.createElement('a', props, children) },
     '@/components/Sidebar': { default: () => React.createElement('nav') },
@@ -55,7 +55,7 @@ async function pageMarkup(filename, launch, error = null) {
     '@/lib/access': { requirePermission: async () => {} },
     '@/lib/runtime': { deploymentEnvironment: () => 'production', runtimeMode: () => 'live' },
     '@/lib/costing': { ugx: value => `UGX ${value}` },
-    '@/lib/integration/health': { getSystemHealth: async () => ({ mode: 'live', environment: 'production', checks: [] }) },
+    '@/lib/integration/health': { getSystemHealth: async () => ({ mode: 'live', environment, checks: [] }) },
     '@/lib/repositories/reports': { getOwnerDashboard: async () => ({ summary: [], bestSellers: [], lowStock: [], recentActivity: [] }) },
     '@/lib/supabase/server': { createClient: async () => ({ rpc: async name => name === 'launch_readiness_summary' ? { data: launch, error } : { data: {}, error: null } }) }
   }).default;
@@ -71,6 +71,12 @@ async function main() {
     assert(failure.includes('FAIL') && failure.includes('BLOCKED'), `${filename} preserves real failures`);
     const unavailable = await pageMarkup(filename, null, { message: 'Network failure' });
     assert(unavailable.includes('UNAVAILABLE'), `${filename} preserves unavailable evidence`);
+  }
+  for (const environment of ['production', 'staging']) {
+    const html = await pageMarkup('system-status-page.tsx', locked, null, environment);
+    assert(html.includes(`Current ${environment} evidence`), 'System Status names the connected environment');
+    assert(html.includes(`The ${environment} application is deployed`), 'Deployment description names the connected environment');
+    assert(html.includes(`Railway ${environment} environment configured`), 'Deployment evidence names the connected environment');
   }
   const Panel = load('LaunchValidationPanel.tsx', { '@/lib/integration/launchReadiness': helper }).default;
   const html = renderToStaticMarkup(React.createElement(Panel, { envChecks: [], dbChecks: locked.database_checks, release: locked, demo: false }));
