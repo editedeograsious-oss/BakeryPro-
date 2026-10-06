@@ -1,7 +1,6 @@
 # TEMPLATE: place this file at .github/workflows/ds-bakery-recovery.yml on the
 # repository's default branch only after the separate target and secrets are ready.
-# Before activating, replace REVIEWED_RECOVERY_COMMIT with the reviewed commit
-# containing recovery/cloud/run.mjs. It must be a full 40-character commit SHA.
+# Recovery code is pinned to reviewed commit 7d240ca21d9ce552520a7056cbc841979f8d9aef.
 name: DS Bakery staging recovery drill
 on:
   workflow_dispatch:
@@ -33,7 +32,7 @@ jobs:
       - name: Check out the reviewed recovery tools
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: REVIEWED_RECOVERY_COMMIT
+          ref: 7d240ca21d9ce552520a7056cbc841979f8d9aef
           persist-credentials: false
       - name: Install the pinned Supabase CLI
         shell: bash
@@ -62,7 +61,7 @@ jobs:
           RESTORE_CONFIRM: ${{ inputs.restore_confirmation }}
           SOURCE_QUIET_CONFIRMED: ${{ inputs.staging_is_quiet }}
           CLOUD_RECOVERY_ARTIFACT_DIR: ${{ github.workspace }}/recovery-results
-          CLOUD_RECOVERY_CODE_SHA: REVIEWED_RECOVERY_COMMIT
+          CLOUD_RECOVERY_CODE_SHA: 7d240ca21d9ce552520a7056cbc841979f8d9aef
         run: node recovery/cloud/run.mjs
       - name: Retain only the encrypted archive and safe summary
         if: ${{ always() && steps.drill.outcome != 'skipped' }}

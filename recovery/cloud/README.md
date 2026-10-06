@@ -24,8 +24,8 @@ The bakery source repository is public. Database output, SQL errors, dumps and r
 
 ## Activation and run
 
-1. Select a full reviewed commit SHA containing `recovery/cloud/run.mjs` and its helper files.
-2. Replace both `REVIEWED_RECOVERY_COMMIT` placeholders in `workflow.yml` with that exact SHA.
+1. The template pins reviewed recovery commit `7d240ca21d9ce552520a7056cbc841979f8d9aef`. Verify that commit before activation; do not change its pin casually.
+2. Finish private secrets and the separately approved empty target.
 3. Put the completed template at `.github/workflows/ds-bakery-recovery.yml` on the default branch (`main`). Manual dispatch requires the workflow on the default branch. Check any default-branch deployment integrations before activation.
 4. Open **Actions → DS Bakery staging recovery drill → Run workflow**. Supply only the non-secret target project ref, type `RESTORE_TO_TEST_ONLY`, and confirm staging writes are paused.
 5. Download the encrypted recovery artifact. GitHub retains it for seven days; download and retain it off-site before expiry. Review the status in `result.json`. A failed or missing result is not a passing drill.
