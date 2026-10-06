@@ -60,7 +60,7 @@ export class RunnerTarget {
     if(!allowFailure&&(result.error||result.status!==0)) throw Error('Disposable target command failed: '+program+' '+args.slice(0,2).join(' '));
     return result;
   }
-  inspect(id) {return JSON.parse(this.call('docker',['inspect',id],{capture:true}).stdout)[0];}
+  inspect(id) {return JSON.parse(this.call('docker',['container','inspect',id],{capture:true}).stdout)[0];}
   assertIsolated() {validateIsolatedContainer(this.inspect(this.proof?.container_id),this.proof);}
   psql(sql,{capture=true}={}) {
     this.assertIsolated();
@@ -68,7 +68,7 @@ export class RunnerTarget {
   }
   async create() {
     // The unique name and volume must not exist before the fresh CLI bootstrap.
-    if(this.call('docker',['inspect',this.bootstrapName],{capture:true,allowFailure:true}).status===0||
+    if(this.call('docker',['container','inspect',this.bootstrapName],{capture:true,allowFailure:true}).status===0||
       this.call('docker',['volume','inspect',this.volumeName],{capture:true,allowFailure:true}).status===0) throw Error('Disposable bootstrap resources already exist');
     fs.mkdirSync(this.workspace,{mode:0o700});
     this.call('supabase',['init','--workdir',this.workspace,'--yes']);
@@ -150,7 +150,7 @@ export class RunnerTarget {
       this.call('docker',['rm','--force',this.createdId]);this.createdId=null;
     }
     if(!this.bootstrapId) {
-      const probe=this.call('docker',['inspect',this.bootstrapName],{capture:true,allowFailure:true});
+      const probe=this.call('docker',['container','inspect',this.bootstrapName],{capture:true,allowFailure:true});
       if(probe.status===0) {
         const candidate=JSON.parse(probe.stdout)[0];
         if(candidate.Name!=='/'+this.bootstrapName||!imagePattern.test(candidate.Config?.Image||'')||candidate.Mounts?.length!==1||candidate.Mounts[0].Name!==this.volumeName) throw Error('Cleanup bootstrap identity mismatch');

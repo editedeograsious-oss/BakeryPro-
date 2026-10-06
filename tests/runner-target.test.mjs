@@ -98,7 +98,8 @@ test('mock bootstrap creates only a fresh isolated target, strips source secrets
         }
         return success();
       }
-      if(args[0]==='inspect') {const value=this.resources.get(args[1]);return value?success(JSON.stringify([value])):{status:1,stdout:''};}
+      if(args[0]==='inspect'&&this.volumeExists) return success(JSON.stringify([{Name:this.volumeName,Driver:'local'}]));
+      if(args[0]==='container'&&args[1]==='inspect') {const value=this.resources.get(args[2]);return value?success(JSON.stringify([value])):{status:1,stdout:''};}
       if(args[0]==='volume'&&args[1]==='inspect') return this.volumeExists?success('[{}]'):{status:1,stdout:''};
       if(args[0]==='create') {
         assert(args.includes('none'));assert(!args.includes('--publish'));
@@ -128,6 +129,7 @@ test('mock bootstrap creates only a fresh isolated target, strips source secrets
     assert(!target.commands.some(c=>c.args.some(a=>a.includes('TEST-ONLY-SENSITIVE'))));
     const config=fs.readFileSync(path.join(target.workspace,'supabase','config.toml'),'utf8');assert(config.includes('major_version = 17'));assert(config.includes(target.project));
     target.cleanup();assert.equal(target.resources.size,0);assert.equal(target.volumeExists,false);
+    assert(!target.commands.some(c=>c.program==='docker'&&c.args[0]==='inspect'),'container lookups never resolve a same-name volume');
     assert(!target.commands.some(c=>c.args.includes('--all')||c.args.includes('prune')));
     const other=new FakeTarget(path.join(work,'not-started'),logfd,env);other.volumeExists=true;other.cleanup();assert.equal(other.volumeExists,true,'cleanup does not touch a volume until fresh bootstrap was attempted');
   } finally {fs.closeSync(logfd);fs.rmSync(work,{recursive:true,force:true});}
