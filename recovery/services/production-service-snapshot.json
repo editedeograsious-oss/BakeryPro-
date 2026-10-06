@@ -257,14 +257,14 @@
   "full_service_recovery_validated": false,
   "pending_private_review": [
     "Independent verification of owner-reported saved Auth URLs and recovery behavior",
-    "Auth providers, email recovery behavior, templates and delivery path; custom SMTP observed disabled",
+    "Validate reported SMTP delivery with an existing account, then review password recovery, Auth providers and templates",
     "Separate private retention of backup passphrase, API/function/deployment secret values",
     "Actual Supabase provider-backup availability and retention",
     "External jobs, webhooks, payment integrations and other service configuration"
   ],
   "final_cutover_approved": false,
   "auth_configuration_review": {
-    "status": "urls_reported_saved_custom_smtp_disabled_email_delivery_unverified",
+    "status": "urls_and_smtp_reported_saved_email_delivery_unverified",
     "reported_saved_at": "2026-10-07T00:32:46+03:00",
     "previous_site_url_reported": "http://localhost:3000",
     "site_url_reported_saved": "https://ds-bakery-web-production.up.railway.app",
@@ -272,8 +272,8 @@
     "evidence_source": "Owner confirmation in chat: URLs saved",
     "independent_dashboard_readback": false,
     "email_delivery_tested": false,
-    "smtp_status": "disabled",
-    "custom_smtp_enabled": false,
+    "smtp_status": "owner_reported_saved_not_independently_read_back",
+    "custom_smtp_enabled": null,
     "smtp_evidence": {
       "source": "Owner-provided production Supabase SMTP screenshot",
       "observed_at": "2026-10-07T00:38:31+03:00",
@@ -282,6 +282,26 @@
       "email_delivery_tested": false
     },
     "staff_account_creation_requires_email_delivery": false,
-    "staff_account_creation_evidence": "Captured deployed create-staff-account source uses Auth admin createUser with email_confirm=true, without inviteUserByEmail."
+    "staff_account_creation_evidence": "Captured deployed create-staff-account source uses Auth admin createUser with email_confirm=true, without inviteUserByEmail.",
+    "last_screenshot_custom_smtp_enabled": false,
+    "custom_smtp_enabled_reported": true,
+    "smtp_saved_reported_at": "2026-10-07T00:52:44+03:00",
+    "smtp_configuration_reported": {
+      "provider": "gmail",
+      "host": "smtp.gmail.com",
+      "port": 587,
+      "sender_name": "DS Bakery",
+      "custom_domain_owned": false,
+      "sender_email_and_username_included": false,
+      "credential_values_included": false,
+      "evidence_source": "Owner confirmation in chat: SMTP saved, following the provided Gmail SMTP setup"
+    },
+    "password_recovery_flow_tested": false,
+    "validation_preflight": {
+      "observed_at": "2026-10-06T21:54:12.237882+00:00",
+      "auth_user_count": 2,
+      "active_staff_count": 1,
+      "existing_active_owner_available": true
+    }
   }
 }

@@ -23,11 +23,17 @@ The function snapshots use `SUPABASE_URL` plus the platform key environment vari
 
 On 2026-10-07 at 00:32 Uganda time, the Owner confirmed saving the production Site URL `https://ds-bakery-web-production.up.railway.app` and redirect `https://ds-bakery-web-production.up.railway.app/auth/callback?next=/reset-password`, after reporting the previous Site URL as `http://localhost:3000`. This records the Owner's confirmation; the connector cannot independently read these private settings. Email delivery, SMTP configuration and the complete recovery flow remain unverified. No email was sent and no live-operation control was changed by this checkpoint update.
 
-## Custom SMTP observed disabled
+## Historical observation: custom SMTP disabled
 
 The Owner's production SMTP screenshot on 2026-10-07 at 00:38 Uganda time shows **Enable custom SMTP OFF**. No SMTP credential was read, no email was sent and the switch was not changed. The captured deployed `create-staff-account` source uses Auth admin `createUser` with `email_confirm: true`, so creating staff through the existing Owner flow does not depend on invitation email delivery. This source review is not a new end-to-end login test.
 
 With Supabase's default mailer, Auth email recipients are restricted to project-team addresses. General staff invitations and password recovery therefore need an appropriate email-delivery configuration before they can be considered verified. Email hooks, provider settings and actual delivery remain unreviewed; do not turn on an empty SMTP configuration. See the [official SMTP requirements](https://supabase.com/docs/guides/auth/auth-smtp).
+
+## Gmail SMTP setup reported saved
+
+On 2026-10-07 at 00:52 Uganda time, the Owner confirmed saving custom SMTP after receiving the Gmail setup: `smtp.gmail.com`, port `587`, sender name `DS Bakery`, the Owner's bakery Gmail address as sender/username, and a privately generated Google App Password. This records the Owner's confirmation, not an independent readback or delivery result. The actual address and credential values are excluded from this public checkpoint. The earlier OFF screenshot remains historical evidence.
+
+A subsequent read-only preflight confirmed Production Lock ON, operations OFF, two existing Auth users and one active staff profile with an available existing Owner. The configured sending address is not itself a registered app account; validation must use an existing staff login email. No account was created and no email was sent by this review. Next, the Owner requests one reset email from the production login page and reports delivery/error without sharing tokens. Only after delivery should the newest link and recovery-page behavior be checked in the same browser; a new password must not be entered or exposed in chat. SMTP delivery, callback behavior, password updating and subsequent login are still unverified.
 
 ## Remaining private settings review
 
