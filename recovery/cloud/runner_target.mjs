@@ -30,9 +30,10 @@ export function validateIsolatedContainer(container,proof) {
   return true;
 }
 
-export function targetPsqlArgs(id,args=[]) {
+export function targetPsqlArgs(id,args=[],role='postgres') {
   if(!hashPattern.test(id||'')) throw Error('A full disposable container identity is required');
-  return ['exec','-i','--user','postgres',id,'psql','--no-psqlrc','--quiet','--variable','ON_ERROR_STOP=1','--username','postgres','--dbname','postgres',...args];
+  if(!['postgres','supabase_admin'].includes(role)) throw Error('Unsupported disposable database role');
+  return ['exec','-i','--user','postgres',id,'psql','--no-psqlrc','--quiet','--variable','ON_ERROR_STOP=1','--username',role,'--dbname','postgres',...args];
 }
 
 export function isolatedEntrypoint(entry,dataDirectory) {
@@ -65,6 +66,17 @@ export class RunnerTarget {
   psql(sql,{capture=true}={}) {
     this.assertIsolated();
     return this.call('docker',targetPsqlArgs(this.proof.container_id,['--tuples-only','--no-align']),{input:sql,capture}).stdout;
+  }
+  assertRestoreAdministrator() {
+    this.assertIsolated();
+    const identity=JSON.parse(this.call('docker',targetPsqlArgs(this.proof.container_id,['--tuples-only','--no-align'],'supabase_admin'),{input:restoreAdministratorSql,capture:true}).stdout);
+    if(identity.current_user!=='supabase_admin'||identity.session_user!=='supabase_admin'||identity.database!=='postgres'||identity.superuser!==true||identity.can_create_roles!==true) throw Error('Disposable restore administrator was not verified');
+  }
+  restorePsql(args,options={}) {
+    // Elevated SQL is confined to the exact fresh, network-isolated container.
+    // No hosted connection or source credentials reach this subprocess.
+    this.assertRestoreAdministrator();this.assertIsolated();
+    return this.call('docker',targetPsqlArgs(this.proof.container_id,args,'supabase_admin'),options);
   }
   async create() {
     // The unique name and volume must not exist before the fresh CLI bootstrap.
@@ -125,6 +137,7 @@ export class RunnerTarget {
     const state=JSON.parse(this.psql(emptyTargetSql));
     if(state.public_objects!==0||state.auth_users!==0||state.postgres_major!==17) throw Error('Restore target is not empty');
     if(this.psql("select current_setting('cron.launch_active_jobs', true);").trim()!=='off') throw Error('Scheduled jobs are not disabled in the disposable target');
+    this.assertRestoreAdministrator();
     // CLI bootstrap can create an empty migration-history schema. Refuse nonempty history.
     this.psql("DO $$DECLARE occupied boolean; BEGIN IF to_regclass('supabase_migrations.schema_migrations') IS NOT NULL THEN EXECUTE 'SELECT EXISTS(SELECT 1 FROM supabase_migrations.schema_migrations)' INTO occupied; IF occupied THEN RAISE EXCEPTION 'Target migration history is not empty'; END IF; END IF; END$$;\nDROP SCHEMA IF EXISTS supabase_migrations CASCADE;\nALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated, service_role;\nALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON SEQUENCES FROM anon, authenticated, service_role;\nALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON FUNCTIONS FROM anon, authenticated, service_role;\n");
     const importDir='/tmp/ds-bakery-import';
@@ -133,8 +146,14 @@ export class RunnerTarget {
     for(const name of names) this.call('docker',['cp',path.join(folder,name),this.proof.container_id+':'+importDir+'/'+name]);
     this.call('docker',['exec','--user','root',this.proof.container_id,'chown','-R','postgres:postgres',importDir]);
     const options=['--single-transaction'];
-    for(const name of names) {if(name==='data.sql') options.push('--command','SET session_replication_role = replica');options.push('--file',importDir+'/'+name);}
-    this.assertIsolated();this.call('docker',targetPsqlArgs(this.proof.container_id,options));
+    for(const name of names) {
+      // Roles require the local platform administrator. Application schema
+      // objects retain postgres ownership and its default privileges.
+      if(name==='schema.sql') options.push('--command','SET ROLE postgres');
+      if(name==='data.sql') options.push('--command','RESET ROLE; SET session_replication_role = replica');
+      options.push('--file',importDir+'/'+name);
+    }
+    this.restorePsql(options);
     const restored=JSON.parse(this.psql(fs.readFileSync(path.join(root,'capture_manifest.sql'),'utf8')));
     fs.writeFileSync(path.join(this.work,'restore','restored_manifest.json'),JSON.stringify(restored,null,2)+'\n',{mode:0o600});
     compareManifests(JSON.parse(fs.readFileSync(path.join(folder,'source_manifest.json'),'utf8')),restored);
@@ -168,3 +187,4 @@ export class RunnerTarget {
 }
 
 const emptyTargetSql="select jsonb_build_object('public_objects',(select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p','v','m','S')),'auth_users',(select count(*) from auth.users),'postgres_major',current_setting('server_version_num')::int / 10000,'data_directory',current_setting('data_directory'));";
+const restoreAdministratorSql="select jsonb_build_object('current_user',current_user,'session_user',session_user,'database',current_database(),'superuser',rolsuper,'can_create_roles',rolcreaterole) from pg_roles where rolname=current_user;";
