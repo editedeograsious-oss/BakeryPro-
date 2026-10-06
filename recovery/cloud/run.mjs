@@ -7,6 +7,7 @@ import {checkPassphrase,encryptBundle} from './encrypted_bundle.mjs';
 import {validateSource,validateTarget} from '../connection_guard.mjs';
 import {sha256} from '../archive.mjs';
 import {RunnerTarget,requireHostedRunner} from './runner_target.mjs';
+import {classifyRecoveryLog} from './diagnose.mjs';
 
 const recoveryRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const repo=path.dirname(recoveryRoot),staging='kymadepeuqhcsjwbrgqq';
@@ -82,7 +83,10 @@ export async function runCloudRecovery(environment=process.env) {
       if(local) await local.restore(folder,archive,staging);
       else command('bash',[path.join(recoveryRoot,'restore_test.sh'),folder,archive]);
       summary.status='passed';summary.stage='complete';summary.database_restore_compared=true;
-    } catch(error) {fs.writeSync(logfd,'\nCloud wrapper: '+String(error.stack)+'\n');}
+    } catch(error) {
+      fs.writeSync(logfd,'\nCloud wrapper: '+String(error.stack)+'\n');
+      if(summary.stage==='restore') summary.restore_diagnosis=classifyRecoveryLog(fs.readFileSync(log,'utf8'));
+    }
     if(local) {
       try {local.cleanup();summary.temporary_target_removed=true;}
       catch(error) {summary.status='failed';summary.stage='cleanup';summary.temporary_target_removed=false;fs.writeSync(logfd,'\nCleanup: '+String(error.stack)+'\n');}
@@ -99,6 +103,7 @@ export async function runCloudRecovery(environment=process.env) {
     fs.writeFileSync(encrypted+'.sha256',summary.encrypted_bundle_sha256+'  recovery-bundle.enc\n',{mode:0o600});
     fs.writeFileSync(path.join(artifacts,'result.json'),JSON.stringify(summary,null,2)+'\n',{mode:0o600});
     console.log(summary.status==='passed'?'Database recovery comparison passed. Retain the encrypted bundle; the launch gate is unchanged.':'Recovery comparison did not pass. Failure details are encrypted.');
+    if(summary.restore_diagnosis) console.log('Restore diagnosis: '+JSON.stringify(summary.restore_diagnosis));
     return summary;
   } finally {
     if(logfd!==null) fs.closeSync(logfd);

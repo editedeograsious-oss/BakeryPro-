@@ -26,6 +26,8 @@ test('runner target rejects laptop/cloud target strings and every weakened isola
     c=>c.NetworkSettings.Networks={none:{},bridge:{}},c=>c.Mounts[0].Name='existing-bakery-data',c=>c.Mounts.push({Type:'bind',Destination:'/private'}),c=>c.State.Running=false
   ]) {const changed=container();weaken(changed);assert.throws(()=>validateIsolatedContainer(changed,proof));}
   assert.throws(()=>targetPsqlArgs('sgmmiymjnqqorvtvpigw'));
+  assert.throws(()=>targetPsqlArgs(id,[],'arbitrary-owner'));
+  assert.throws(()=>targetPsqlArgs('sgmmiymjnqqorvtvpigw',[],'supabase_admin'));
   const args=targetPsqlArgs(id);assert(args.includes(id));assert(!args.includes('--host'));assert(!args.some(value=>value.includes('supabase.co')));
   const entry=['sh','-c','docker-entrypoint.sh postgres -D /etc/postgresql \n'];
   assert(isolatedEntrypoint(entry,'/var/lib/postgresql/data')[2].includes('cron.launch_active_jobs = off'));
@@ -43,12 +45,13 @@ test('runner restore refuses occupied targets and failed imports, and compares a
     table_counts:counts,auth_user_count:2,guards:{environment_mode:'staging',production_lock:false,operations_enabled:false},migrations:[{version:'20261006102222',name:'fixture'}],
     public_security:Object.keys(counts).sort().map(table=>({table,rls:true,forced:false})),raw_material_stock:[{id:'test-only-flour',quantity:95}]};
   class RestoreTarget extends RunnerTarget {
-    constructor() {super(work,logfd,env);this.proof={...proof};this.commands=[];this.occupied=false;this.failImport=false;this.restored=structuredClone(manifest);this.network='none';}
+    constructor() {super(work,logfd,env);this.proof={...proof};this.commands=[];this.occupied=false;this.failImport=false;this.adminIdentity={current_user:'supabase_admin',session_user:'supabase_admin',database:'postgres',superuser:true,can_create_roles:true};this.restored=structuredClone(manifest);this.network='none';}
     inspect() {const c=container();c.HostConfig.NetworkMode=this.network;return c;}
     call(program,args,options={}) {
       this.commands.push({program,args,input:options.input});
       if(args.includes('--single-transaction')&&this.failImport) throw Error('Test-only import failure');
       if(options.input?.includes('public_objects')) return {status:0,stdout:JSON.stringify({public_objects:this.occupied?1:0,auth_users:0,postgres_major:17})};
+      if(options.input?.includes("'current_user',current_user")) return {status:0,stdout:JSON.stringify(this.adminIdentity)};
       if(options.input?.includes("current_setting('cron.launch_active_jobs'")) return {status:0,stdout:'off\n'};
       if(options.input?.includes('recovery_verification_manifest')) return {status:0,stdout:JSON.stringify(this.restored)};
       return {status:0,stdout:''};
@@ -71,12 +74,22 @@ test('runner restore refuses occupied targets and failed imports, and compares a
     const failed=new RestoreTarget();failed.failImport=true;
     await assert.rejects(()=>failed.restore(folder,archive,source),/import failure/);
     assert(!failed.commands.some(c=>c.input?.includes('recovery_verification_manifest')));
+    for(const changed of [{superuser:false},{can_create_roles:false},{current_user:'postgres'},{session_user:'postgres'},{database:'template1'}]) {
+      const unverified=new RestoreTarget();Object.assign(unverified.adminIdentity,changed);
+      await assert.rejects(()=>unverified.restore(folder,archive,source),/administrator was not verified/);
+      assert(!unverified.commands.some(c=>c.args[0]==='cp'||c.args.includes('--single-transaction')||c.input?.includes('DROP SCHEMA')));
+    }
     const mismatch=new RestoreTarget();mismatch.restored.manifest.financial_totals.supplier_payments_total+=10000;
     await assert.rejects(()=>mismatch.restore(folder,archive,source),/comparison failed/);
     const matched=new RestoreTarget();assert(await matched.restore(folder,archive,source));
     const command=matched.commands.find(c=>c.args.includes('--single-transaction'));
     assert(command.args.includes('ON_ERROR_STOP=1'));
-    assert(command.args.indexOf('SET session_replication_role = replica')<command.args.indexOf('/tmp/ds-bakery-import/data.sql'));
+    assert.equal(command.args[command.args.indexOf('--username')+1],'supabase_admin');
+    assert(command.args.indexOf('SET ROLE postgres')<command.args.indexOf('/tmp/ds-bakery-import/schema.sql'));
+    assert(command.args.indexOf('SET ROLE postgres')>command.args.indexOf('/tmp/ds-bakery-import/roles.sql'));
+    assert(command.args.indexOf('RESET ROLE; SET session_replication_role = replica')<command.args.indexOf('/tmp/ds-bakery-import/data.sql'));
+    assert(command.args.indexOf('RESET ROLE; SET session_replication_role = replica')>command.args.indexOf('/tmp/ds-bakery-import/history_schema.sql'));
+    assert(matched.commands.filter(c=>c.input?.includes('recovery_verification_manifest')).every(c=>c.args[c.args.indexOf('--username')+1]==='postgres'));
     assert(!matched.commands.some(c=>c.args.includes('--host')||c.args.some(a=>a.includes('supabase.co'))));
   } finally {fs.closeSync(logfd);fs.rmSync(work,{recursive:true,force:true});}
 });
