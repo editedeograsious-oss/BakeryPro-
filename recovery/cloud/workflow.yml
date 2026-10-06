@@ -1,0 +1,78 @@
+# TEMPLATE: place this file at .github/workflows/ds-bakery-recovery.yml on the
+# repository's default branch only after the separate target and secrets are ready.
+# Before activating, replace REVIEWED_RECOVERY_COMMIT with the reviewed commit
+# containing recovery/cloud/run.mjs. It must be a full 40-character commit SHA.
+name: DS Bakery staging recovery drill
+on:
+  workflow_dispatch:
+    inputs:
+      target_project_ref:
+        description: Separate empty Supabase recovery project ref (20 lowercase letters)
+        required: true
+        type: string
+      restore_confirmation:
+        description: Type RESTORE_TO_TEST_ONLY after checking the separate target
+        required: true
+        type: string
+      staging_is_quiet:
+        description: No staging writes are taking place during this backup
+        required: true
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: ds-bakery-staging-recovery
+  cancel-in-progress: false
+jobs:
+  recovery:
+    if: github.repository == 'editedeograsious-oss/BakeryPro-' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out the reviewed recovery tools
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: REVIEWED_RECOVERY_COMMIT
+          persist-credentials: false
+      - name: Install the pinned Supabase CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v node
+          command -v psql
+          docker info >/dev/null
+          tool_archive="$RUNNER_TEMP/supabase-cli.tar.gz"
+          curl --fail --silent --show-error --location \
+            https://github.com/supabase/cli/releases/download/v2.119.0/supabase_2.119.0_linux_amd64.tar.gz \
+            --output "$tool_archive"
+          printf '%s  %s\n' bf1c3ae93be98533eb8a3105dbf4564bd0b2d9dc24690d8a920f980ef975c1b4 "$tool_archive" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/bakery-tools"
+          tar -xzf "$tool_archive" -C "$RUNNER_TEMP/bakery-tools" supabase
+          echo "$RUNNER_TEMP/bakery-tools" >> "$GITHUB_PATH"
+      - name: Export, restore and compare privately
+        id: drill
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.BAKERY_STAGING_DATABASE_URL }}
+          TARGET_DATABASE_URL: ${{ secrets.BAKERY_RECOVERY_TARGET_DATABASE_URL }}
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BAKERY_BACKUP_PASSPHRASE }}
+          SOURCE_PROJECT_REF: kymadepeuqhcsjwbrgqq
+          TARGET_PROJECT_REF: ${{ inputs.target_project_ref }}
+          RESTORE_CONFIRM: ${{ inputs.restore_confirmation }}
+          SOURCE_QUIET_CONFIRMED: ${{ inputs.staging_is_quiet }}
+          CLOUD_RECOVERY_ARTIFACT_DIR: ${{ github.workspace }}/recovery-results
+          CLOUD_RECOVERY_CODE_SHA: REVIEWED_RECOVERY_COMMIT
+        run: node recovery/cloud/run.mjs
+      - name: Retain only the encrypted archive and safe summary
+        if: ${{ always() && steps.drill.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ds-bakery-encrypted-recovery-${{ github.run_id }}
+          path: |
+            recovery-results/recovery-bundle.enc
+            recovery-results/recovery-bundle.enc.sha256
+            recovery-results/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+          include-hidden-files: false
