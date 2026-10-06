@@ -9,9 +9,10 @@ import RecycleActionButton from "@/components/admin/RecycleActionButton";
 type DraftLine={raw_material_id:string;ordered_qty_base:number;unit_cost_base:number};
 
 export default function PurchaseOrderManager({
-  orders,suppliers,materials,live,canApprove
+  orders,suppliers,materials,live,canApprove,operationsAllowed=true,operationsReason="Business operations are enabled"
 }:{
   orders:any[];suppliers:any[];materials:any[];live:boolean;canApprove:boolean;
+  operationsAllowed?:boolean;operationsReason?:string;
 }){
   const router=useRouter();
   const [supplierId,setSupplierId]=useState(suppliers[0]?.id??"");
@@ -38,6 +39,7 @@ export default function PurchaseOrderManager({
   }
 
   async function createPO(){
+    if(!operationsAllowed){setMessage(operationsReason);return;}
     if(!supplierId||lines.length===0){setMessage("Choose a supplier and add at least one line.");return;}
     if(lines.some(l=>!l.raw_material_id||l.ordered_qty_base<=0||l.unit_cost_base<0)){setMessage("Every line needs a material, positive quantity and valid unit cost.");return;}
     if(!live){setMessage("Demo mode: purchase order creation simulated.");return;}
@@ -65,6 +67,7 @@ export default function PurchaseOrderManager({
   }
 
   async function decide(id:string,decision:"approve"|"reject"){
+    if(!operationsAllowed){setMessage(operationsReason);return;}
     if(!canApprove){setMessage("Only Owner/Manager can approve purchase orders.");return;}
     if(!live){setMessage(`Demo mode: purchase order ${decision}d.`);return;}
     setBusy(true);setMessage("");
@@ -88,6 +91,7 @@ export default function PurchaseOrderManager({
       </div>
     </div>
 
+    {!operationsAllowed&&<div className="hero" style={{padding:14}}><b>Live operations are locked.</b><div style={{marginTop:4}}>{operationsReason}</div></div>}
     {message&&<div className="hero" style={{padding:14}}><b>{message}</b></div>}
 
     <div className="grid4">
@@ -125,7 +129,7 @@ export default function PurchaseOrderManager({
       <button className="btn secondary" onClick={addLine}>+ Line</button>
       <div className="field"><label>Notes</label><input value={notes} onChange={e=>setNotes(e.target.value)}/></div>
       <p><b>Draft total: {ugx(draftTotal)}</b></p>
-      <button className="btn primary" disabled={busy} onClick={createPO}>{busy?"Working...":"Create Purchase Order"}</button>
+      <button className="btn primary" disabled={busy||!operationsAllowed} onClick={createPO}>{busy?"Working...":"Create Purchase Order"}</button>
     </div>
 
     <div className="tablewrap" style={{marginTop:16}}>
@@ -144,7 +148,7 @@ export default function PurchaseOrderManager({
         <td><span className={o.payment_status==="paid"?"badge green":o.payment_status==="partial"?"badge gold":"badge"}>{String(o.payment_status??"").toUpperCase()}</span></td>
         <td>{o.due_date??"—"}</td>
         <td><div className="action-row">
-          {canApprove&&o.approval_status==="pending"&&<><button className="btn primary" disabled={busy} onClick={()=>decide(o.id,"approve")}>Approve</button><button className="btn secondary" disabled={busy} onClick={()=>decide(o.id,"reject")}>Reject</button></>}
+          {canApprove&&o.approval_status==="pending"&&<><button className="btn primary" disabled={busy||!operationsAllowed} onClick={()=>decide(o.id,"approve")}>Approve</button><button className="btn secondary" disabled={busy||!operationsAllowed} onClick={()=>decide(o.id,"reject")}>Reject</button></>}
           {canApprove&&["draft","ordered"].includes(o.status)&&Number(o.amount_paid||0)===0&&<RecycleActionButton entityType="purchase" entityId={o.id} label={o.purchase_no??"Purchase"} live={live}/>}
         </div></td>
       </tr>)}</tbody></table>
