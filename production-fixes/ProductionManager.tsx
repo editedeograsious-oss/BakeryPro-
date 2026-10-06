@@ -4,65 +4,126 @@ import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import RecycleActionButton from "@/components/admin/RecycleActionButton";
-import { ugx } from "@/lib/costing";
 
-type CostEntry={packaging:number;labour:number;utilities:number;other:number;waste:number;good:number};
-
-export default function ProductionManager({plan,products,bakers,recipes,live,canManage}:{plan:any[];products:any[];bakers:any[];recipes:any[];live:boolean;canManage:boolean}){
+export default function ProductionManager({
+  plan,products,bakers,live,canManage,recipeIngredients
+}:{
+  plan:any[];products:any[];bakers:any[];live:boolean;canManage:boolean;recipeIngredients:any[];
+}){
   const router=useRouter();
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
-  const [editingPlanId,setEditingPlanId]=useState<string|null>(null);
-  const [businessDate,setBusinessDate]=useState(plan[0]?.business_date??"");
   const [productId,setProductId]=useState(products[0]?.id??"");
   const [bakerId,setBakerId]=useState(bakers[0]?.id??"");
   const [shift,setShift]=useState("morning");
   const [planned,setPlanned]=useState(0);
   const [notes,setNotes]=useState("");
   const [quantities,setQuantities]=useState<Record<string,number>>({});
-  const [costs,setCosts]=useState<Record<string,CostEntry>>({});
-  const [usage,setUsage]=useState<Record<string,Record<string,number>>>({});
+  const [wasteQty,setWasteQty]=useState<Record<string,number>>({});
+  const [wasteReason,setWasteReason]=useState<Record<string,string>>({});
+  const [actualUsage,setActualUsage]=useState<Record<string,Record<string,number>>>({});
   const requestIds=useRef<Record<string,string>>({});
   const planRequestId=useRef(crypto.randomUUID());
 
-  const totals=useMemo(()=>({planned:plan.reduce((s,r)=>s+Number(r.planned_qty||0),0),produced:plan.reduce((s,r)=>s+Number(r.produced_qty||0),0)}),[plan]);
-  const recipeFor=(product:string)=>recipes.find((r:any)=>r.product_id===product);
-  const costFor=(id:string,qty:number):CostEntry=>costs[id]??{packaging:0,labour:0,utilities:0,other:0,waste:0,good:qty};
+  const totals=useMemo(()=>({
+    planned:plan.reduce((s,r)=>s+Number(r.planned_qty||0),0),
+    produced:plan.reduce((s,r)=>s+Number(r.produced_qty||0),0),
+  }),[plan]);
 
-  function resetPlan(){setEditingPlanId(null);setBusinessDate(plan[0]?.business_date??"");setProductId(products[0]?.id??"");setBakerId("");setShift("morning");setPlanned(0);setNotes("");planRequestId.current=crypto.randomUUID();}
-
-  async function startEditPlan(row:any){if(!canManage)return;setBusy(true);setMessage("");try{const supabase=createClient();const {data,error}=await supabase.from("production_plan_items").select("notes").eq("id",row.id).single();if(error)throw error;setEditingPlanId(row.id);setBusinessDate(row.business_date);setProductId(row.product_id);setBakerId(row.assigned_baker_id??"");setShift(row.shift);setPlanned(Number(row.planned_qty));setNotes(data?.notes??"");window.scrollTo({top:0,behavior:"smooth"});}catch(e){setMessage(e instanceof Error?e.message:"Could not load production plan.");}finally{setBusy(false);}}
-
-  async function savePlan(){
-    if(!canManage){setMessage("Only CEO / General Manager can manage production plans.");return;}
+  async function createPlan(){
+    if(!canManage){setMessage("Only Owner/Manager can create production plans.");return;}
     if(!productId||planned<=0){setMessage("Choose a product and enter planned quantity.");return;}
-    if(!live){setMessage(`Demo mode: production plan ${editingPlanId?"update":"creation"} simulated.`);return;}
+    if(!live){setMessage("Demo mode: production plan creation simulated.");return;}
     setBusy(true);setMessage("");
-    try{const supabase=createClient();if(editingPlanId){const reason=window.prompt("Reason for correcting this production plan:")?.trim();if(!reason){setBusy(false);setMessage("Correction reason is required.");return;}const {error}=await supabase.rpc("edit_production_plan_item",{p_plan_item_id:editingPlanId,p_business_date:businessDate||null,p_product_id:productId,p_assigned_baker_id:bakerId||null,p_shift:shift,p_planned_qty:planned,p_notes:notes.trim()||null,p_reason:reason});if(error)throw error;setMessage("Production plan corrected.");}else{const {error}=await supabase.rpc("create_production_plan_item",{p_business_date:businessDate||null,p_product_id:productId,p_assigned_baker_id:bakerId||null,p_shift:shift,p_planned_qty:planned,p_notes:notes.trim()||null,p_client_request_id:planRequestId.current});if(error)throw error;setMessage("Production plan item created.");}resetPlan();router.refresh();}catch(e){setMessage(e instanceof Error?e.message:"Could not save plan.");}finally{setBusy(false);}
+    try{
+      const supabase=createClient();
+      const {error}=await supabase.rpc("create_production_plan_item",{
+        p_business_date:null,
+        p_product_id:productId,
+        p_assigned_baker_id:bakerId||null,
+        p_shift:shift,
+        p_planned_qty:planned,
+        p_notes:notes.trim()||null,
+        p_client_request_id:planRequestId.current,
+      });
+      if(error)throw error;
+      setMessage("Production plan item created.");
+      planRequestId.current=crypto.randomUUID();
+      setPlanned(0);setNotes("");
+      router.refresh();
+    }catch(e){setMessage(e instanceof Error?e.message:"Could not create plan.");}
+    finally{setBusy(false);}
   }
 
-  function suggestedUsage(row:any,item:any,qty:number){const recipe=recipeFor(row.product_id);if(!recipe||Number(recipe.yield_qty)<=0)return 0;return Number(item.quantity_base_unit||0)/Number(recipe.yield_qty)*qty;}
+  async function confirmRun(id:string){
+    const qty=Number(quantities[id]??0);
+    if(qty<=0){setMessage("Enter a positive produced quantity.");return;}
+    if(!live){setMessage("Demo mode: production confirmation simulated.");return;}
 
-  async function confirmRun(row:any){
-    const qty=Number(quantities[row.id]??0);if(qty<=0){setMessage("Enter a positive produced quantity.");return;}
-    const c=costFor(row.id,qty);const good=Number(c.good||qty);const waste=Number(c.waste||0);
-    if(good<=0||waste<0||Math.abs((good+waste)-qty)>0.000001){setMessage("Good / sellable quantity + waste quantity must equal total produced quantity.");return;}
-    if(!live){setMessage(`Demo mode: ${good} good units and ${waste} waste units confirmed.`);return;}
-    const requestId=requestIds.current[row.id]??crypto.randomUUID();requestIds.current[row.id]=requestId;
-    const recipe=recipeFor(row.product_id);const actual=(recipe?.recipe_items??[]).map((i:any)=>({raw_material_id:i.raw_material_id,quantity_used_base:Number(usage[row.id]?.[i.raw_material_id]??suggestedUsage(row,i,qty))}));
+    const requestId=requestIds.current[id]??crypto.randomUUID();
+    requestIds.current[id]=requestId;
+
     setBusy(true);setMessage("");
-    try{const supabase=createClient();const {data,error}=await supabase.rpc("confirm_production_run_actual",{p_plan_item_id:row.id,p_quantity_produced:good,p_actual_consumptions:actual,p_process_waste_qty:waste,p_process_waste_reason:waste>0?"Recorded production process waste":null,p_packaging_cost:c.packaging,p_labour_cost:c.labour,p_utilities_cost:c.utilities,p_other_overhead_cost:c.other,p_client_request_id:requestId});if(error)throw error;setMessage(`Production confirmed • run ${data}`);delete requestIds.current[row.id];setQuantities(v=>({...v,[row.id]:0}));router.refresh();}catch(e){setMessage(e instanceof Error?e.message:"Could not confirm production.");}finally{setBusy(false);}
+    try{
+      const supabase=createClient();
+      const row=plan.find(x=>x.id===id);
+      const ingredients=recipeIngredients.filter((x:any)=>x.product_id===row?.product_id);
+      const actual=ingredients.map((x:any)=>({raw_material_id:x.raw_material_id,quantity_used_base:Number(actualUsage[id]?.[x.raw_material_id]??0)})).filter((x:any)=>x.quantity_used_base>0);
+      const {data,error}=await supabase.rpc("confirm_production_run_actual",{
+        p_plan_item_id:id,p_quantity_produced:qty,p_actual_consumptions:actual.length?actual:null,
+        p_process_waste_qty:Number(wasteQty[id]??0),p_process_waste_reason:wasteReason[id]?.trim()||null,
+        p_packaging_cost:null,p_labour_cost:null,p_utilities_cost:null,p_other_overhead_cost:null,p_client_request_id:requestId,
+      });
+      if(error)throw error;
+      setMessage(`Production confirmed • run ${data}`);
+      delete requestIds.current[id];
+      setQuantities(prev=>({...prev,[id]:0}));setWasteQty(prev=>({...prev,[id]:0}));setWasteReason(prev=>({...prev,[id]:""}));setActualUsage(prev=>({...prev,[id]:{}}));
+      router.refresh();
+    }catch(e){setMessage(e instanceof Error?e.message:"Could not confirm production.");}
+    finally{setBusy(false);}
   }
 
   return <>
-    <div className="pagehead"><div><h1>Daily Bake Plan</h1><p>Plan batches, record actual ingredient usage, waste and non-ingredient costs.</p></div><span className={canManage?"badge green":"badge gold"}>{canManage?"Planning Access":"Baker View"}</span></div>
+    <div className="pagehead">
+      <div><h1>Daily Bake Plan</h1><p>Actual ingredient usage, production loss and true batch costing feed finished-goods stock automatically.</p></div>
+      <span className={canManage?"badge green":"badge gold"}>{canManage?"Planning Access":"Baker View"}</span>
+    </div>
+
     {message&&<div className="hero" style={{padding:14}}><b>{message}</b></div>}
-    <div className="grid4"><div className="card stat"><div className="label">Planned Units</div><div className="value">{totals.planned.toLocaleString()}</div></div><div className="card stat"><div className="label">Produced</div><div className="value">{totals.produced.toLocaleString()}</div></div><div className="card stat"><div className="label">Remaining</div><div className="value">{Math.max(0,totals.planned-totals.produced).toLocaleString()}</div></div><div className="card stat"><div className="label">Completion</div><div className="value">{totals.planned?Math.round(totals.produced/totals.planned*100):0}%</div></div></div>
-    {canManage&&<div className="card" style={{marginTop:16}}><div className="pagehead" style={{marginBottom:8}}><div><h3 style={{margin:0}}>{editingPlanId?"Edit Production Plan Item":"Add Production Plan Item"}</h3></div>{editingPlanId&&<button className="btn secondary" onClick={resetPlan}>Cancel Edit</button>}</div><div className="grid2"><div className="field"><label>Business date</label><input type="date" value={businessDate} onChange={e=>setBusinessDate(e.target.value)}/></div><div className="field"><label>Product</label><select value={productId} onChange={e=>setProductId(e.target.value)}>{products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div></div><div className="grid2"><div className="field"><label>Assigned baker</label><select value={bakerId} onChange={e=>setBakerId(e.target.value)}><option value="">Unassigned</option>{bakers.map(b=><option key={b.id} value={b.id}>{b.full_name}</option>)}</select></div></div><div className="grid2"><div className="field"><label>Shift</label><select value={shift} onChange={e=>setShift(e.target.value)}><option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option></select></div><div className="field"><label>Planned quantity</label><input type="number" min="0.001" step="any" value={planned} onChange={e=>setPlanned(Number(e.target.value))}/></div></div><div className="field"><label>Notes</label><input value={notes} onChange={e=>setNotes(e.target.value)}/></div><button className="btn primary" disabled={busy} onClick={savePlan}>{busy?"Working…":editingPlanId?"Save Plan Changes":"Add to Bake Plan"}</button></div>}
-    <div style={{display:"grid",gap:14,marginTop:16}}>{plan.length===0?<div className="card">No production plan items for today.</div>:plan.map(row=>{const qty=Number(quantities[row.id]??0);const recipe=recipeFor(row.product_id);const c=costFor(row.id,qty);return <div className="card" key={row.id}><div style={{display:"flex",justifyContent:"space-between",gap:12,flexWrap:"wrap"}}><div><h3 style={{margin:0}}>{row.product_name}</h3><small>{row.shift} • {row.baker_name??"Unassigned"} • Planned {Number(row.planned_qty)} • Produced {Number(row.produced_qty)}</small></div><span className={row.status==="complete"?"badge green":"badge gold"}>{row.status}</span></div>
-      {row.status!=="complete"&&row.status!=="cancelled"&&<><div className="grid2" style={{marginTop:12}}><div className="field"><label>Total produced now</label><input type="number" min="0" value={qty} onChange={e=>setQuantities(v=>({...v,[row.id]:Number(e.target.value)}))}/></div><div className="field"><label>Good / sellable quantity</label><input type="number" min="0" value={c.good} onChange={e=>setCosts(v=>({...v,[row.id]:{...costFor(row.id,qty),good:Number(e.target.value)}}))}/></div></div><div className="field"><label>Waste quantity</label><input type="number" min="0" value={c.waste} onChange={e=>setCosts(v=>({...v,[row.id]:{...costFor(row.id,qty),waste:Number(e.target.value)}}))}/></div>
-      {recipe&&<div className="tablewrap"><table><thead><tr><th>Ingredient</th><th>Suggested</th><th>Actual Used</th></tr></thead><tbody>{(recipe.recipe_items??[]).map((i:any)=>{const suggestion=suggestedUsage(row,i,qty);return <tr key={i.raw_material_id}><td>{i.raw_materials?.name??"Ingredient"}</td><td>{suggestion.toFixed(3)} {i.raw_materials?.base_unit??""}</td><td><input type="number" min="0" step="any" value={usage[row.id]?.[i.raw_material_id]??suggestion} onChange={e=>setUsage(v=>({...v,[row.id]:{...(v[row.id]??{}),[i.raw_material_id]:Number(e.target.value)}}))}/></td></tr>})}</tbody></table></div>}
-      <div className="grid4" style={{marginTop:12}}>{([['packaging','Packaging'],['labour','Labour'],['utilities','Utilities'],['other','Other']] as const).map(([key,label])=><div className="field" key={key}><label>{label} cost (UGX)</label><input type="number" min="0" value={c[key]} onChange={e=>setCosts(v=>({...v,[row.id]:{...costFor(row.id,qty),[key]:Number(e.target.value)}}))}/></div>)}</div><div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}><button className="btn primary" disabled={busy} onClick={()=>confirmRun(row)}>Confirm Actual Production</button>{canManage&&Number(row.produced_qty||0)===0&&<button className="btn secondary" disabled={busy} onClick={()=>startEditPlan(row)}>Edit Plan</button>}{canManage&&Number(row.produced_qty||0)===0&&<RecycleActionButton entityType="production_plan_item" entityId={row.id} label={`${row.product_name} production plan`} live={live}/>}<small>Extra batch costs: {ugx(c.packaging+c.labour+c.utilities+c.other)}</small></div></>}
-    </div>})}</div>
+
+    <div className="grid4">
+      <div className="card stat"><div className="label">Planned Units</div><div className="value">{totals.planned.toLocaleString()}</div></div>
+      <div className="card stat"><div className="label">Produced</div><div className="value">{totals.produced.toLocaleString()}</div></div>
+      <div className="card stat"><div className="label">Remaining</div><div className="value">{Math.max(0,totals.planned-totals.produced).toLocaleString()}</div></div>
+      <div className="card stat"><div className="label">Completion</div><div className="value">{totals.planned?Math.round(totals.produced/totals.planned*100):0}%</div></div>
+    </div>
+
+    {canManage&&<div className="card" style={{marginTop:16}}>
+      <h3 style={{color:"var(--brown)",marginTop:0}}>Add Production Plan Item</h3>
+      <div className="grid2">
+        <div className="field"><label>Product</label><select value={productId} onChange={e=>setProductId(e.target.value)}>{products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></div>
+        <div className="field"><label>Assigned baker</label><select value={bakerId} onChange={e=>setBakerId(e.target.value)}><option value="">Unassigned</option>{bakers.map(b=><option key={b.id} value={b.id}>{b.full_name}</option>)}</select></div>
+      </div>
+      <div className="grid2">
+        <div className="field"><label>Shift</label><select value={shift} onChange={e=>setShift(e.target.value)}><option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option></select></div>
+        <div className="field"><label>Planned quantity</label><input type="number" min="0.001" step="any" value={planned} onChange={e=>setPlanned(Number(e.target.value))}/></div>
+      </div>
+      <div className="field"><label>Notes</label><input value={notes} onChange={e=>setNotes(e.target.value)} placeholder="Production note"/></div>
+      <button className="btn primary" disabled={busy} onClick={createPlan}>{busy?"Working…":"Add to Bake Plan"}</button>
+    </div>}
+
+    <div className="tablewrap" style={{marginTop:16}}>
+      <table><thead><tr><th>Product</th><th>Shift</th><th>Planned</th><th>Produced</th><th>Remaining</th><th>Baker</th><th>Status</th><th>Confirm Run / Delete</th></tr></thead>
+      <tbody>{plan.length===0?<tr><td colSpan={8}>No production plan items for today.</td></tr>:plan.map(r=><tr key={r.id}>
+        <td><b>{r.product_name}</b></td><td>{String(r.shift).replace("_"," ")}</td><td>{Number(r.planned_qty).toLocaleString()}</td><td>{Number(r.produced_qty).toLocaleString()}</td><td>{Number(r.remaining_qty).toLocaleString()}</td><td>{r.baker_name??"Unassigned"}</td>
+        <td><span className={r.status==="complete"?"badge green":"badge gold"}>{r.status}</span></td>
+        <td>{r.status==="complete"||r.status==="cancelled"?<span style={{color:"var(--muted)"}}>Closed</span>:<div style={{minWidth:300}}><div className="action-row"><input type="number" min="0.001" step="any" style={{maxWidth:95}} title="Good sellable units" value={quantities[r.id]??0} onChange={e=>setQuantities(prev=>({...prev,[r.id]:Number(e.target.value)}))}/><input type="number" min="0" step="any" style={{maxWidth:90}} title="Process waste units" placeholder="Waste" value={wasteQty[r.id]??0} onChange={e=>setWasteQty(prev=>({...prev,[r.id]:Number(e.target.value)}))}/><button className="btn secondary" disabled={busy} onClick={()=>confirmRun(r.id)}>Confirm</button>{canManage&&Number(r.produced_qty||0)===0&&<RecycleActionButton entityType="production_plan_item" entityId={r.id} label={`${r.product_name} production plan`} live={live}/>}</div><input style={{marginTop:6,width:"100%"}} placeholder="Waste reason (if any)" value={wasteReason[r.id]??""} onChange={e=>setWasteReason(prev=>({...prev,[r.id]:e.target.value}))}/>{recipeIngredients.filter((x:any)=>x.product_id===r.product_id).length>0&&<details style={{marginTop:6}}><summary style={{cursor:"pointer",fontWeight:700}}>Actual ingredient usage (optional)</summary>{recipeIngredients.filter((x:any)=>x.product_id===r.product_id).map((x:any)=><div className="grid2" key={x.raw_material_id}><small>{x.ingredient_name} ({x.base_unit})</small><input type="number" min="0" step="any" placeholder="Leave blank to use recipe standard" value={actualUsage[r.id]?.[x.raw_material_id]??""} onChange={e=>setActualUsage(prev=>({...prev,[r.id]:{...(prev[r.id]??{}),[x.raw_material_id]:Number(e.target.value)}}))}/></div>)}</details>}</div>}</td>
+      </tr>)}</tbody></table>
+    </div>
+
+    <div className="hero" style={{marginTop:16}}>
+      <h2>Atomic production</h2>
+      <p>The database checks branch stock before posting. Actual ingredient usage may override the recipe standard, while packaging, labour, utilities and overhead come from the product true-cost profile unless management overrides them.</p>
+    </div>
   </>;
 }
