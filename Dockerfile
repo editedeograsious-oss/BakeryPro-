@@ -51,7 +51,17 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && cp /tmp/production-fixes/LiveManagementReport.tsx /app/site/components/reports/LiveManagementReport.tsx \
   && cp /tmp/production-fixes/purchases-page.tsx /app/site/app/purchases/page.tsx \
   && cp /tmp/production-fixes/purchase-orders-page.tsx /app/site/app/purchase-orders/page.tsx \
+  && cp /tmp/production-fixes/Sidebar.tsx /app/site/components/Sidebar.tsx \
+  && cp /tmp/production-fixes/PublicShop.tsx /app/site/components/public/PublicShop.tsx \
+  && cp /tmp/production-fixes/public-home-page.tsx /app/site/app/page.tsx \
+  && cp /tmp/production-fixes/public-site-live.ts /app/site/lib/repositories/publicSiteLive.ts \
+  && cp /tmp/production-fixes/ProductionManager.tsx /app/site/components/operations/ProductionManager.tsx \
+  && cp /tmp/production-fixes/AttendanceManager.tsx /app/site/components/admin/AttendanceManager.tsx \
+  && cp /tmp/production-fixes/ScheduleManager.tsx /app/site/components/admin/ScheduleManager.tsx \
+  && cp /tmp/production-fixes/BranchManager.tsx /app/site/components/v038/BranchManager.tsx \
+  && cp /tmp/production-fixes/PromotionManager.tsx /app/site/components/v038/PromotionManager.tsx \
   && find /app/site/app /app/site/components -type f -name '*.tsx' -exec sed -i 's#/ds-bakery-logo.svg#/ds-bakery-logo.png#g' {} + \
+  && node /tmp/production-fixes/clean-mojibake.js /app/site \
   && cp /app/site/public/ds-bakery-logo.png /app/site/app/icon.png \
   && cp /app/site/public/ds-bakery-logo.png /app/site/app/apple-icon.png \
   && rm -rf /tmp/ds-bakery.zip /tmp/v038-patch.zip /tmp/staging-v038 /tmp/production-fixes
