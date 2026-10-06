@@ -27,7 +27,7 @@ jobs:
       - name: Check out the reviewed recovery tools
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: 07e3a98f9cecb4a75c7745bf6bfc809707e2a243
+          ref: aae5fc601eb9ae9e82c2603d86cb4758e25fc96f
           persist-credentials: false
       - name: Install the pinned Supabase CLI
         shell: bash
@@ -55,7 +55,7 @@ jobs:
           RESTORE_CONFIRM: ${{ inputs.restore_confirmation }}
           SOURCE_QUIET_CONFIRMED: ${{ inputs.staging_is_quiet }}
           CLOUD_RECOVERY_ARTIFACT_DIR: ${{ github.workspace }}/recovery-results
-          CLOUD_RECOVERY_CODE_SHA: 07e3a98f9cecb4a75c7745bf6bfc809707e2a243
+          CLOUD_RECOVERY_CODE_SHA: aae5fc601eb9ae9e82c2603d86cb4758e25fc96f
         run: node recovery/cloud/run.mjs
       - name: Retain only the encrypted archive and safe summary
         if: ${{ always() && steps.drill.outcome != 'skipped' }}
