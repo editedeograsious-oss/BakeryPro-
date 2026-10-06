@@ -93,7 +93,7 @@ test('mock bootstrap creates only a fresh isolated target, strips source secrets
       if(program==='supabase') {
         if(args[0]==='init') {const directory=path.join(this.workspace,'supabase');fs.mkdirSync(directory);fs.writeFileSync(path.join(directory,'config.toml'),'project_id = "test"\n[db]\nmajor_version = 15\n');}
         else if(args[0]==='db'&&args[1]==='start'&&!args.includes('--help')) {
-          const bootstrap={Id:'b'.repeat(64),Image:imageId,Name:'/'+this.bootstrapName,Config:{Image:proof.source_image,Env:['POSTGRES_PASSWORD=local-only'],Entrypoint:['sh','-c','docker-entrypoint.sh postgres -D /etc/postgresql'],Cmd:[]},Mounts:[{Type:'volume',Name:this.volumeName,Destination:'/var/lib/postgresql/data'}]};
+          const bootstrap={Id:'b'.repeat(64),Image:imageId,Name:'/'+this.bootstrapName,Config:{Image:proof.source_image,Env:['POSTGRES_PASSWORD=local-only'],Entrypoint:['sh'],Cmd:['-c','docker-entrypoint.sh postgres -D /etc/postgresql']},Mounts:[{Type:'volume',Name:this.volumeName,Destination:'/var/lib/postgresql/data'}]};
           this.resources.set(this.bootstrapName,bootstrap);this.resources.set(bootstrap.Id,bootstrap);this.volumeExists=true;
         }
         return success();
@@ -123,6 +123,8 @@ test('mock bootstrap creates only a fresh isolated target, strips source secrets
     assert(target.commands.some(c=>c.program==='supabase'&&c.args.join(' ')==='db start --help'));
     assert(target.commands.some(c=>c.program==='docker'&&c.args.includes('create')&&c.args.includes(imageId)));
     assert(target.commands.some(c=>c.program==='docker'&&c.args[0]==='create'&&c.args.some(a=>a.includes('cron.launch_active_jobs = off')&&a.includes('/postgresql.auto.conf'))));
+    const created=target.commands.find(c=>c.program==='docker'&&c.args[0]==='create');
+    assert.equal(created.args.filter(a=>a==='-c').length,1,'Docker Entrypoint/Cmd are combined exactly once');
     assert(!target.commands.some(c=>c.args.some(a=>a.includes('TEST-ONLY-SENSITIVE'))));
     const config=fs.readFileSync(path.join(target.workspace,'supabase','config.toml'),'utf8');assert(config.includes('major_version = 17'));assert(config.includes(target.project));
     target.cleanup();assert.equal(target.resources.size,0);assert.equal(target.volumeExists,false);

@@ -95,8 +95,10 @@ export class RunnerTarget {
       '--label',label+'='+this.runId,'--label','ds-bakery.recovery.kind=isolated-restore',
       '--mount','type=volume,source='+this.volumeName+',target=/var/lib/postgresql/data'];
     for(const value of initial.Config.Env||[]) args.push('--env',value);
-    const entry=isolatedEntrypoint(initial.Config.Entrypoint,empty.data_directory);
-    args.push('--entrypoint',entry[0],initial.Image,...entry.slice(1),...(initial.Config.Cmd||[]));
+    // Docker can split `sh -c SCRIPT` into Entrypoint=[sh], Cmd=[-c,SCRIPT].
+    // Normalize the complete argv before adding the cold-volume configuration.
+    const entry=isolatedEntrypoint([...(initial.Config.Entrypoint||[]),...(initial.Config.Cmd||[])],empty.data_directory);
+    args.push('--entrypoint',entry[0],initial.Image,...entry.slice(1));
     const id=this.call('docker',args,{capture:true}).stdout.trim();
     if(!hashPattern.test(id)) throw Error('Invalid created container identity');
     this.createdId=id;
