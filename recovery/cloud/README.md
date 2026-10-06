@@ -90,3 +90,9 @@ Official references:
 - https://docs.github.com/en/actions/concepts/runners/github-hosted-runners
 - https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow
 - https://supabase.com/docs/guides/platform/migrating-within-supabase/backup-restore
+
+## Production export diagnosis and retry handling
+
+The first real production run `37526164513` failed during export, before any restore or completed database archive. The exact temporary target was removed, and the independently verified encrypted failure report was retained. Private diagnosis `37527249295` authenticated that exact failed-production ciphertext and reported only `SOURCE_AUTHENTICATION_FAILED`. A passing diagnosis is not a passing recovery drill; production still has no matching passing backup/restore evidence.
+
+The production secret must be corrected privately before a new manual run on `main`. Production backup failures now automatically report fixed error categories without exposing credentials or database values. Recovery artifact names include the run attempt, so retries retain separate ciphertext rather than conflicting with or replacing previous evidence. The originally verified staging tools pin is unchanged, and the actual restore implementation and all operation guards are unchanged. All 18 recovery safety tests pass, including private diagnosis identity checks, plaintext cleanup and production authentication-error suppression. See [the production correction steps](production-setup.md#first-production-export-and-private-credential-correction).

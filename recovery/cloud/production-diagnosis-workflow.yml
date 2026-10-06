@@ -1,0 +1,40 @@
+# Private diagnosis of one verified failed production export. No database connection is supplied.
+name: DS Bakery private production backup diagnosis
+on:
+  push:
+    branches: [ds-bakery-production-recovery-diagnosis]
+    paths: [.github/workflows/ds-bakery-production-backup-diagnosis.yml]
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: ds-bakery-private-production-backup-diagnosis
+  cancel-in-progress: false
+jobs:
+  diagnosis:
+    if: github.repository == 'editedeograsious-oss/BakeryPro-' && github.ref == 'refs/heads/ds-bakery-production-recovery-diagnosis' && github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Check out the tested private diagnosis tools
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 5eb41d79a8183e3109abd00d339c7682a890ba79
+          persist-credentials: false
+      - name: Download only the verified encrypted production failure report
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0
+        with:
+          artifact-ids: '11442581900'
+          run-id: '37526164513'
+          repository: editedeograsious-oss/BakeryPro-
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/ds-bakery-production-diagnosis-input
+          merge-multiple: true
+      - name: Report only fixed production export error categories
+        env:
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BAKERY_BACKUP_PASSPHRASE }}
+          DIAGNOSIS_INPUT_DIR: ${{ runner.temp }}/ds-bakery-production-diagnosis-input
+          DIAGNOSIS_BUNDLE_SHA256: 9097c426d9c61c9920cd75cd8e257c34e2c0ee74ddb2f40a2afece6569e491de
+          DIAGNOSIS_CODE_SHA: 6626fb805324fd71ed6e583aed8bb347086daa91
+        run: node recovery/cloud/production_backup_diagnosis.mjs
+

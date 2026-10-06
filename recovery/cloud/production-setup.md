@@ -29,3 +29,15 @@ The workflow reads production only. It produces an encrypted archive and a safe 
 After database recovery, separately review Storage files, Auth/provider/SMTP settings, Edge Functions, Vault/encryption-key portability, Realtime, Railway configuration and external jobs. Final cutover still requires explicit Owner approval.
 
 Official connection reference: https://supabase.com/docs/guides/database/connecting-to-postgres
+
+## First production export and private credential correction
+
+Run [37526164513](https://github.com/editedeograsious-oss/BakeryPro-/actions/runs/37526164513), using tools `6626fb805324fd71ed6e583aed8bb347086daa91`, failed during export before any restore or completed database archive. Its exact temporary target was removed. The encrypted failure report was retained as `DS_Bakery_Production_Recovery_20261006_Attempt1.zip`; its ZIP SHA-256 is `62437fc2e181e9a327591eb7fd37d0948f6e5965c214319b6669ff186f879805`, and encrypted bundle SHA-256 is `9097c426d9c61c9920cd75cd8e257c34e2c0ee74ddb2f40a2afece6569e491de`. This is failed-run evidence, not a database backup or recovery pass.
+
+Private diagnosis [37527249295](https://github.com/editedeograsious-oss/BakeryPro-/actions/runs/37527249295) authenticated that exact ciphertext and failed-production identity, returned only `SOURCE_AUTHENTICATION_FAILED`, and removed temporary plaintext. No database connection was supplied to the diagnosis. Production recovery remains unverified and has no passing backup/restore evidence.
+
+Correct the existing `BAKERY_PRODUCTION_DATABASE_URL` privately using the current production database password and the actual production Session pooler URI from Supabase. If the password previously shown in a screenshot was real, replace it first at the production Database Settings page. Use the PowerShell helper with the untouched password placeholder at its first prompt and the replacement password only at the separate hidden prompt. Update the existing GitHub secret; do not change the backup passphrase.
+
+Then start a **new** manual production recovery run on **main**, with the same exact restore confirmation and a quiet production source. Re-running the first failure uses its older immutable workflow, whose artifact name does not separate attempts. The updated workflows include the attempt number in encrypted-artifact names, preserving each attempt without deleting an earlier report. The updated production tools automatically emit fixed-category backup diagnosis; private database errors remain encrypted. The new safe category does not change a failed result to passed.
+
+Supabase documents that the shared pooler can temporarily return authentication failures immediately after a password reset; retry with the current password if this happens. Credentials must still match the production database. Official reference: https://supabase.com/docs/guides/troubleshooting/how-do-i-reset-my-supabase-database-password-oTs5sB

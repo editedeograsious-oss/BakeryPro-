@@ -8,6 +8,7 @@ import {validateSource,validateTarget} from '../connection_guard.mjs';
 import {sha256} from '../archive.mjs';
 import {RunnerTarget,requireHostedRunner} from './runner_target.mjs';
 import {classifyRecoveryLog} from './diagnose.mjs';
+import {classifyProductionBackupLog} from './production_backup_diagnosis.mjs';
 
 const recoveryRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const repo=path.dirname(recoveryRoot);
@@ -100,6 +101,7 @@ export async function runCloudRecovery(environment=process.env,sourceScope='stag
     } catch(error) {
       fs.writeSync(logfd,'\nCloud wrapper: '+String(error.stack)+'\n');
       if(summary.stage==='restore') summary.restore_diagnosis=classifyRecoveryLog(fs.readFileSync(log,'utf8'));
+      if(summary.stage==='backup'&&sourceScope==='production') summary.backup_diagnosis=classifyProductionBackupLog(fs.readFileSync(log,'utf8'));
     }
     if(local) {
       try {local.cleanup();summary.temporary_target_removed=true;}
@@ -118,6 +120,7 @@ export async function runCloudRecovery(environment=process.env,sourceScope='stag
     fs.writeFileSync(path.join(artifacts,'result.json'),JSON.stringify(summary,null,2)+'\n',{mode:0o600});
     console.log(summary.status==='passed'?'Database recovery comparison passed. Retain the encrypted bundle; the launch gate is unchanged.':'Recovery comparison did not pass. Failure details are encrypted.');
     if(summary.restore_diagnosis) console.log('Restore diagnosis: '+JSON.stringify(summary.restore_diagnosis));
+    if(summary.backup_diagnosis) console.log('Backup diagnosis: '+JSON.stringify(summary.backup_diagnosis));
     return summary;
   } finally {
     if(logfd!==null) fs.closeSync(logfd);
