@@ -8,7 +8,9 @@ The hosted restore-project route is blocked by the account's two-project free li
 
 ## Readiness verified; bakery drill pending
 
-The manual runner recovery workflow is installed at `.github/workflows/ds-bakery-recovery.yml` on `main`, pinned to the passing tools commit. It has no automatic trigger. The hosted recovery template remains outside `.github/workflows`. The separate runner-readiness job cannot export either bakery database. A real bakery database export, restore and passing evidence remain pending. The mock tests and runner-readiness check do not count as a real drill.
+The manual runner recovery workflow is installed at `.github/workflows/ds-bakery-recovery.yml` on `main`, pinned to reviewed recovery tools. It has no automatic trigger. The hosted recovery template remains outside `.github/workflows`. The separate runner-readiness job cannot export either bakery database. A real bakery database export, restore and passing evidence remain pending. The mock tests and runner-readiness check do not count as a real drill.
+
+The first real manual attempt, [37505876487](https://github.com/editedeograsious-oss/BakeryPro-/actions/runs/37505876487), stopped at setup before temporary-target creation or staging export. Both private secrets were supplied and the manual confirmations were correct. No archive or recovery evidence was produced. Setup diagnostics now identify the failed check using fixed public codes and instructions; they never print secret values or original exception messages. `BACKUP_PASSPHRASE` identifies the encryption-key requirement, while `SOURCE_CONNECTION` identifies the staging connection-string requirement. Correct the named secret privately before starting a new manual attempt. The recovery target, export, restore, encryption and launch guards remain the same as the passing readiness revision.
 
 The disposable runner route needs no third hosted Supabase project. If the optional hosted-target route is used later, obtain the organisation's quoted project cost and any required billing approval first. Do not delete or reuse the existing staging/production databases to make room.
 
@@ -29,7 +31,7 @@ The bakery source repository is public. Database output, SQL errors, dumps and r
 
 ## Activation and run
 
-1. The credentials-free runner-readiness check passed. `runner-workflow.yml` pins that exact reviewed recovery-tools commit, `61febb65d1196851b9b0cb1f121b652fd74042ea`. Do not change its pin casually. The older `workflow.yml` template remains an optional hosted-target route.
+1. The credentials-free runner-readiness check passed using `61febb65d1196851b9b0cb1f121b652fd74042ea`. The temporary-target implementation remains identical to that passing revision. `runner-workflow.yml` pins an immutable reviewed recovery-tools revision with safe setup diagnostics; all 13 recovery safety tests pass for the diagnostic changes. Do not change the pin casually. The older `workflow.yml` template remains an optional hosted-target route.
 2. Finish the two private secrets. Keep staging quiet for the full export and comparison.
 3. The completed runner template is installed at `.github/workflows/ds-bakery-recovery.yml` on the default branch (`main`). Manual dispatch requires the workflow on the default branch. The existing DS Bakery v0.38 Railway services use their separate staging/production branches; their sources were checked before this workflow was installed.
 4. Open **Actions → DS Bakery staging recovery drill → Run workflow**. Type `RESTORE_TO_TEST_ONLY` and confirm staging writes are paused. The temporary runner target is selected by the reviewed workflow; no hosted target URL/ref is accepted.

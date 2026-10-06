@@ -12,20 +12,41 @@ const recoveryRoot=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..
 const repo=path.dirname(recoveryRoot),staging='kymadepeuqhcsjwbrgqq';
 const within=(parent,child)=>{const relative=path.relative(parent,child);return relative===''||(!relative.startsWith('..'+path.sep)&&relative!=='..'&&!path.isAbsolute(relative));};
 
+// Public setup diagnostics are fixed strings. Never print an exception message,
+// URL, passphrase, filesystem path or subprocess output from this boundary.
+const setupMessages=Object.freeze({
+  BACKUP_PASSPHRASE:'Update BAKERY_BACKUP_PASSPHRASE privately with a unique random value of at least 32 characters.',
+  SOURCE_PROJECT:'This recovery workflow requires the reviewed staging project.',
+  SOURCE_CONNECTION:'Update BAKERY_STAGING_DATABASE_URL privately with the complete staging direct/session-pooler URI on port 5432. Replace the password placeholder, remove its square brackets and encode password symbols.',
+  RUNNER_TARGET:'The temporary target requires a GitHub-hosted runner and accepts no hosted target connection.',
+  TARGET_KIND:'Use the reviewed recovery target kind.',
+  HOSTED_TARGET:'A hosted restore target must be separate from both bakery databases and match its explicit project reference.',
+  MANUAL_CONFIRMATIONS:'Type RESTORE_TO_TEST_ONLY and confirm staging writes are paused.',
+  ARTIFACT_DIRECTORY:'The encrypted-artifact directory and private temporary directory must be configured separately.'
+});
+class RecoverySetupError extends Error {
+  constructor(code) {super('Recovery setup check failed');this.code=code;}
+}
+const setupCheck=(code,check)=>{try {check();}catch {throw new RecoverySetupError(code);}};
+export function recoveryFailureMessage(error) {
+  if(error instanceof RecoverySetupError&&Object.hasOwn(setupMessages,error.code)) return 'Online recovery setup failed ['+error.code+']. '+setupMessages[error.code]+' No secret values are printed.';
+  return 'Online recovery setup failed. Check the required private secrets, target identity and manual confirmations. No database details are printed.';
+}
+
 export async function runCloudRecovery(environment=process.env) {
   // Validate before starting a command or creating a backup. The first online drill is staging only.
-  checkPassphrase(environment.BACKUP_ENCRYPTION_PASSPHRASE);
-  if(environment.SOURCE_PROJECT_REF!==staging) throw Error('The first online recovery workflow requires staging');
-  validateSource(environment.DATABASE_URL,staging);
+  setupCheck('BACKUP_PASSPHRASE',()=>checkPassphrase(environment.BACKUP_ENCRYPTION_PASSPHRASE));
+  setupCheck('SOURCE_PROJECT',()=>{if(environment.SOURCE_PROJECT_REF!==staging) throw Error();});
+  setupCheck('SOURCE_CONNECTION',()=>validateSource(environment.DATABASE_URL,staging));
   const temporaryTarget=environment.RESTORE_TARGET_KIND==='runner-local';
-  if(temporaryTarget) requireHostedRunner(environment);
-  else if(environment.RESTORE_TARGET_KIND&&environment.RESTORE_TARGET_KIND!=='hosted') throw Error('Unknown restore target kind');
-  else validateTarget(environment.TARGET_DATABASE_URL,environment.TARGET_PROJECT_REF,staging);
-  if(environment.RESTORE_CONFIRM!=='RESTORE_TO_TEST_ONLY'||environment.SOURCE_QUIET_CONFIRMED!=='true') throw Error('Restore and quiet-source checks are required');
-  if(!environment.CLOUD_RECOVERY_ARTIFACT_DIR) throw Error('Choose an encrypted-artifact output directory');
+  if(temporaryTarget) setupCheck('RUNNER_TARGET',()=>requireHostedRunner(environment));
+  else if(environment.RESTORE_TARGET_KIND&&environment.RESTORE_TARGET_KIND!=='hosted') throw new RecoverySetupError('TARGET_KIND');
+  else setupCheck('HOSTED_TARGET',()=>validateTarget(environment.TARGET_DATABASE_URL,environment.TARGET_PROJECT_REF,staging));
+  if(environment.RESTORE_CONFIRM!=='RESTORE_TO_TEST_ONLY'||environment.SOURCE_QUIET_CONFIRMED!=='true') throw new RecoverySetupError('MANUAL_CONFIRMATIONS');
+  if(!environment.CLOUD_RECOVERY_ARTIFACT_DIR) throw new RecoverySetupError('ARTIFACT_DIRECTORY');
   const base=path.resolve(environment.CLOUD_RECOVERY_TEMP_DIR||environment.RUNNER_TEMP||os.tmpdir());
   const artifacts=path.resolve(environment.CLOUD_RECOVERY_ARTIFACT_DIR);
-  if(within(repo,base)||within(base,artifacts)||within(artifacts,base)) throw Error('Private temporary files and artifact outputs must be separate');
+  if(within(repo,base)||within(base,artifacts)||within(artifacts,base)) throw new RecoverySetupError('ARTIFACT_DIRECTORY');
   fs.mkdirSync(artifacts,{mode:0o700});
   const work=fs.mkdtempSync(path.join(base,'ds-bakery-cloud-'));
   const bundle=work+'.tar.gz';
@@ -87,5 +108,5 @@ export async function runCloudRecovery(environment=process.env) {
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href) {
   try {const result=await runCloudRecovery();if(result.status!=='passed') process.exitCode=1;}
-  catch {console.error('Online recovery setup failed. Check the required private secrets, target identity and manual confirmations. No database details are printed.');process.exitCode=1;}
+  catch(error) {console.error(recoveryFailureMessage(error));process.exitCode=1;}
 }

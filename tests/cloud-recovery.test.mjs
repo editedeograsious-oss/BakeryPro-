@@ -6,12 +6,19 @@ import path from 'node:path';
 import {execFileSync,spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {checkPassphrase,encryptBundle,decryptBundle} from '../recovery/cloud/encrypted_bundle.mjs';
+import {recoveryFailureMessage} from '../recovery/cloud/run.mjs';
 
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const passphrase='TEST-ONLY-RANDOM-BACKUP-PASSPHRASE-2026';
 const staging='kymadepeuqhcsjwbrgqq',production='sgmmiymjnqqorvtvpigw',target='abcdefghijklmnopqrst';
 const url=ref=>`postgresql://postgres:TEST-ONLY-PRIVATE-PASSWORD@db.${ref}.supabase.co:5432/postgres?sslmode=require`;
 const temporary=()=>fs.mkdtempSync(path.join(os.tmpdir(),'bakery-cloud-test-'));
+
+test('unexpected setup errors never expose their private exception message',()=>{
+  const message=recoveryFailureMessage(Error('SECRET-URL-AND-PASSWORD-SHOULD-NOT-APPEAR'));
+  assert(message.startsWith('Online recovery setup failed.'));
+  assert(!message.includes('SECRET-URL-AND-PASSWORD-SHOULD-NOT-APPEAR'));
+});
 
 test('encrypted bundles round trip and use fresh randomness without exposing plaintext',async()=>{
   const work=temporary();
@@ -62,14 +69,27 @@ test('cloud wrapper encrypts mock outputs, suppresses secrets, blocks protected 
       TARGET_DATABASE_URL:url(target),TARGET_PROJECT_REF:target,RESTORE_CONFIRM:'RESTORE_TO_TEST_ONLY',SOURCE_QUIET_CONFIRMED:'true',
       BACKUP_ENCRYPTION_PASSPHRASE:passphrase,CLOUD_RECOVERY_TEMP_DIR:privateBase,CLOUD_TEST_COMMANDS:commands,CLOUD_TEST_MANIFEST:JSON.stringify(fixture)};
     const run=(name,override={})=>spawnSync(process.execPath,[path.join(repo,'recovery/cloud/run.mjs')],{env:{...env,CLOUD_RECOVERY_ARTIFACT_DIR:path.join(work,name),...override},encoding:'utf8'});
-    for(const [name,override] of [
-      ['protected',{TARGET_DATABASE_URL:url(production),TARGET_PROJECT_REF:production}],
-      ['production-source',{DATABASE_URL:url(production),SOURCE_PROJECT_REF:production}],
-      ['quiet-missing',{SOURCE_QUIET_CONFIRMED:'false'}],
-      ['short-password',{BACKUP_ENCRYPTION_PASSPHRASE:'short'}],
-      ['temporary-not-hosted',{RESTORE_TARGET_KIND:'runner-local',TARGET_DATABASE_URL:'',TARGET_PROJECT_REF:'',GITHUB_ACTIONS:'false',RUNNER_ENVIRONMENT:'self-hosted'}],
-      ['temporary-hosted-url',{RESTORE_TARGET_KIND:'runner-local',GITHUB_ACTIONS:'true',RUNNER_ENVIRONMENT:'github-hosted'}]
-    ]) {const result=run(name,override);assert.notEqual(result.status,0);assert(!fs.existsSync(commands));assert(!fs.existsSync(path.join(work,name)));assert(!result.stderr.includes('TEST-ONLY-PRIVATE-PASSWORD'));}
+    for(const [name,override,code] of [
+      ['protected',{TARGET_DATABASE_URL:url(production),TARGET_PROJECT_REF:production},'HOSTED_TARGET'],
+      ['production-source',{DATABASE_URL:url(production),SOURCE_PROJECT_REF:production},'SOURCE_PROJECT'],
+      ['source-url-hash',{DATABASE_URL:url(staging)+'#SECRET-URL-SUFFIX'},'SOURCE_CONNECTION'],
+      ['source-url-password-only',{DATABASE_URL:'SECRET-NOT-A-CONNECTION-STRING'},'SOURCE_CONNECTION'],
+      ['quiet-missing',{SOURCE_QUIET_CONFIRMED:'false'},'MANUAL_CONFIRMATIONS'],
+      ['confirmation-missing',{RESTORE_CONFIRM:'SECRET-UNEXPECTED-CONFIRMATION'},'MANUAL_CONFIRMATIONS'],
+      ['short-password',{BACKUP_ENCRYPTION_PASSPHRASE:'SECRET-SHORT-PASSWORD'},'BACKUP_PASSPHRASE'],
+      ['missing-password',{BACKUP_ENCRYPTION_PASSPHRASE:''},'BACKUP_PASSPHRASE'],
+      ['temporary-not-hosted',{RESTORE_TARGET_KIND:'runner-local',TARGET_DATABASE_URL:'',TARGET_PROJECT_REF:'',GITHUB_ACTIONS:'false',RUNNER_ENVIRONMENT:'self-hosted'},'RUNNER_TARGET'],
+      ['temporary-hosted-url',{RESTORE_TARGET_KIND:'runner-local',GITHUB_ACTIONS:'true',RUNNER_ENVIRONMENT:'github-hosted'},'RUNNER_TARGET'],
+      ['unknown-target-kind',{RESTORE_TARGET_KIND:'SECRET-UNKNOWN-TARGET'},'TARGET_KIND'],
+      ['missing-artifact-directory',{CLOUD_RECOVERY_ARTIFACT_DIR:''},'ARTIFACT_DIRECTORY'],
+      ['overlapping-artifact-directory',{CLOUD_RECOVERY_ARTIFACT_DIR:privateBase},'ARTIFACT_DIRECTORY']
+    ]) {
+      const result=run(name,override);assert.notEqual(result.status,0);assert(!fs.existsSync(commands));
+      if(name!=='overlapping-artifact-directory') assert(!fs.existsSync(path.join(work,name)));
+      assert(result.stderr.includes('['+code+']'),result.stderr);
+      assert(!result.stderr.includes('TEST-ONLY-PRIVATE-PASSWORD'));assert(!result.stdout.includes('TEST-ONLY-PRIVATE-PASSWORD'));
+      assert(!result.stderr.includes('SECRET-'));assert(!result.stderr.includes(work));
+    }
     let result=run('success');assert.equal(result.status,0,result.stderr);
     assert(!result.stdout.includes('TEST-ONLY-SENSITIVE'));assert(!result.stdout.includes('TEST-ONLY-PRIVATE-PASSWORD'));assert.equal(result.stderr,'');
     const artifacts=path.join(work,'success');assert.deepEqual(fs.readdirSync(artifacts).sort(),['recovery-bundle.enc','recovery-bundle.enc.sha256','result.json']);
