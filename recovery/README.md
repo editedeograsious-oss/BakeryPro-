@@ -6,12 +6,13 @@ This operator workflow replaces the older archive scripts for the real recovery 
 
 - The read-only capture query ran successfully against both existing bakery databases.
 - Both have 80 public application tables with RLS enabled. Production Lock remains ON and operations remain OFF.
-- The automated tests use mocked command-line tools, not a real database export or restore. A real archive and separate-target restore are still pending.
-- The real, credentials-free online runner check passed on 2026-10-06: [run 37489648596](https://github.com/editedeograsious-oss/BakeryPro-/actions/runs/37489648596). It verified the empty PostgreSQL 17 target, isolation, disabled scheduled jobs, test-only SQL and cleanup. It is not a bakery archive or restore drill.
+- The automated safety tests use mocked command-line tools. The real staging export and isolated PostgreSQL 17 restore also passed on 2026-10-06: [run 37512818845](https://github.com/editedeograsious-oss/BakeryPro-/actions/runs/37512818845). Its encrypted artifact and hashes were retained; the actual source and restored manifests matched. Three matching Owner evidence records were saved, and the staging backup gate reads `pass`.
+- Production still needs its own verified archive and matching recovery drill; production operations remain disabled.
+- The initial credentials-free online runner check passed on 2026-10-06: [run 37489648596](https://github.com/editedeograsious-oss/BakeryPro-/actions/runs/37489648596). It verified the empty PostgreSQL 17 target, isolation, disabled scheduled jobs, test-only SQL and cleanup. It is not a bakery archive or restore drill.
 
 ## Trusted machine
 
-For an online runner instead of a Windows installation, use the manual [GitHub Actions workflow](cloud/README.md). The temporary target has passed its readiness check and needs no third hosted Supabase project. Configure the private staging connection and encryption passphrase, keep staging quiet and run the manual drill. The real bakery drill is still pending.
+For an online runner instead of a Windows installation, use the manual [GitHub Actions workflow](cloud/README.md). The temporary target has passed its readiness check and needs no third hosted Supabase project. The private staging connection and encryption passphrase are configured, and the staging drill passed. Keep staging quiet for any future export and comparison. The production archive and matching recovery drill remain pending. See the [retained staging evidence](cloud/README.md#staging-recovery-verified-production-recovery-pending).
 
 Use Bash on Linux, macOS or Windows with WSL/Git Bash, Node.js 20+, Docker running, Supabase CLI, PostgreSQL `psql`, and `tar` on PATH.
 Keep private environment settings and all backup files outside the public app and source control. Never paste connection strings or passwords into chat.
