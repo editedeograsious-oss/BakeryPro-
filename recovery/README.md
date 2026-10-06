@@ -10,6 +10,8 @@ This operator workflow replaces the older archive scripts for the real recovery 
 
 ## Trusted machine
 
+For an online runner instead of a Windows installation, use the prepared [GitHub Actions workflow](cloud/README.md). The template needs private secrets and a separately approved empty restore project before activation. The real drill is still pending.
+
 Use Bash on Linux, macOS or Windows with WSL/Git Bash, Node.js 20+, Docker running, Supabase CLI, PostgreSQL `psql`, and `tar` on PATH.
 Keep private environment settings and all backup files outside the public app and source control. Never paste connection strings or passwords into chat.
 The Supabase CLI runs its dump through Docker. Check the installed CLI's version and `supabase db dump --help`; the backup script also does this before exporting.
