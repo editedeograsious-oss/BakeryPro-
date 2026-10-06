@@ -48,6 +48,8 @@ Then review launch readiness. Final production cutover still requires the user's
 
 ## Deployment
 Web fixes were built and deployed successfully before these signed-in checks.
-Staging web commit: 1db532e88a585c09cbd1e12e80d6285dd56af0f9
-Production web commit: ddc3e83a1a7aac958a79486b23524f8bc5f532ae
-These recovery changes are SQL-only and were deployed directly as native Supabase migrations. The web source has not changed.
+Web commits used for the initial signed-in checks:
+Staging: 1db532e88a585c09cbd1e12e80d6285dd56af0f9
+Production: ddc3e83a1a7aac958a79486b23524f8bc5f532ae
+The recovery functions were deployed directly as native Supabase migrations.
+System Status environment wording was also corrected to use the runtime environment, so production no longer describes itself as staging. The existing readiness render tests cover both environment labels.
