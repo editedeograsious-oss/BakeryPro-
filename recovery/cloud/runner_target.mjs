@@ -35,12 +35,14 @@ export function targetPsqlArgs(id,args=[]) {
   return ['exec','-i','--user','postgres',id,'psql','--no-psqlrc','--quiet','--variable','ON_ERROR_STOP=1','--username','postgres','--dbname','postgres',...args];
 }
 
-export function isolatedEntrypoint(entry) {
-  const command=/^docker-entrypoint\.sh postgres -D \/etc\/postgresql[^\n]*$/gm;
-  if(entry?.length!==3||entry[0]!=='sh'||entry[1]!=='-c'||typeof entry[2]!=='string'||[...entry[2].matchAll(command)].length!==1) throw Error('Unexpected bootstrap entrypoint');
-  // Supabase's postgres role cannot ALTER SYSTEM for this setting. Set it on
-  // the server command line, before readiness, rather than changing role grants.
-  return [entry[0],entry[1],entry[2].replace(command,line=>line+' -c cron.launch_active_jobs=off')];
+export function isolatedEntrypoint(entry,dataDirectory) {
+  if(!Array.isArray(entry)||entry.length<3||entry[0]!=='sh'||entry[1]!=='-c'||typeof entry[2]!=='string'||!entry[2]) throw Error('Unexpected bootstrap entrypoint');
+  if(typeof dataDirectory!=='string'||!/^\/var\/lib\/postgresql\/data(?:\/[A-Za-z0-9_.-]+)*$/.test(dataDirectory)||dataDirectory.split('/').some(part=>part==='.'||part==='..')) throw Error('Database data directory is outside the fresh mounted volume');
+  // Preserve the pinned CLI's startup script. The old container is stopped;
+  // the replacement sets this in its fresh volume before starting PostgreSQL.
+  // Reading back the effective value is required before any archive import.
+  const prefix="printf '\\n%s\\n' 'cron.launch_active_jobs = off' >> '"+dataDirectory+"/postgresql.auto.conf'\n";
+  return [entry[0],entry[1],prefix+entry[2],...entry.slice(3)];
 }
 
 export class RunnerTarget {
@@ -93,7 +95,7 @@ export class RunnerTarget {
       '--label',label+'='+this.runId,'--label','ds-bakery.recovery.kind=isolated-restore',
       '--mount','type=volume,source='+this.volumeName+',target=/var/lib/postgresql/data'];
     for(const value of initial.Config.Env||[]) args.push('--env',value);
-    const entry=isolatedEntrypoint(initial.Config.Entrypoint);
+    const entry=isolatedEntrypoint(initial.Config.Entrypoint,empty.data_directory);
     args.push('--entrypoint',entry[0],initial.Image,...entry.slice(1),...(initial.Config.Cmd||[]));
     const id=this.call('docker',args,{capture:true}).stdout.trim();
     if(!hashPattern.test(id)) throw Error('Invalid created container identity');
@@ -163,4 +165,4 @@ export class RunnerTarget {
   }
 }
 
-const emptyTargetSql="select jsonb_build_object('public_objects',(select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p','v','m','S')),'auth_users',(select count(*) from auth.users),'postgres_major',current_setting('server_version_num')::int / 10000);";
+const emptyTargetSql="select jsonb_build_object('public_objects',(select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace where n.nspname='public' and c.relkind in ('r','p','v','m','S')),'auth_users',(select count(*) from auth.users),'postgres_major',current_setting('server_version_num')::int / 10000,'data_directory',current_setting('data_directory'));";

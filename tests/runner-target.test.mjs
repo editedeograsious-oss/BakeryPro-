@@ -28,9 +28,10 @@ test('runner target rejects laptop/cloud target strings and every weakened isola
   assert.throws(()=>targetPsqlArgs('sgmmiymjnqqorvtvpigw'));
   const args=targetPsqlArgs(id);assert(args.includes(id));assert(!args.includes('--host'));assert(!args.some(value=>value.includes('supabase.co')));
   const entry=['sh','-c','docker-entrypoint.sh postgres -D /etc/postgresql \n'];
-  assert(isolatedEntrypoint(entry)[2].includes('-c cron.launch_active_jobs=off'));
-  assert.throws(()=>isolatedEntrypoint(['sh','-c','other-postgres-command']));
-  assert.throws(()=>isolatedEntrypoint(['sh','-c',entry[2]+entry[2]]));
+  assert(isolatedEntrypoint(entry,'/var/lib/postgresql/data')[2].includes('cron.launch_active_jobs = off'));
+  assert(isolatedEntrypoint(entry,'/var/lib/postgresql/data/pgdata')[2].endsWith(entry[2]));
+  assert.throws(()=>isolatedEntrypoint(['bash','-c','test'],'/var/lib/postgresql/data'));
+  for(const directory of ['/etc/postgresql','/var/lib/postgresql/data/../../secret',"/var/lib/postgresql/data'; unsafe-command"]) assert.throws(()=>isolatedEntrypoint(entry,directory));
 });
 
 test('runner restore refuses occupied targets and failed imports, and compares actual restored money',async()=>{
@@ -106,7 +107,7 @@ test('mock bootstrap creates only a fresh isolated target, strips source secrets
       }
       if(args[0]==='exec'&&args.includes('psql')) {
         if(options.input==='select 1;') return success('1\n');
-        if(options.input?.includes('public_objects')) return success('{"public_objects":0,"auth_users":0,"postgres_major":17}\n');
+        if(options.input?.includes('public_objects')) return success('{"public_objects":0,"auth_users":0,"postgres_major":17,"data_directory":"/var/lib/postgresql/data"}\n');
         if(options.input?.includes("current_setting('cron.launch_active_jobs'")) return success('off\n');
         return success('');
       }
@@ -121,7 +122,7 @@ test('mock bootstrap creates only a fresh isolated target, strips source secrets
     await target.create();target.assertIsolated();
     assert(target.commands.some(c=>c.program==='supabase'&&c.args.join(' ')==='db start --help'));
     assert(target.commands.some(c=>c.program==='docker'&&c.args.includes('create')&&c.args.includes(imageId)));
-    assert(target.commands.some(c=>c.program==='docker'&&c.args[0]==='create'&&c.args.some(a=>a.includes('-c cron.launch_active_jobs=off'))));
+    assert(target.commands.some(c=>c.program==='docker'&&c.args[0]==='create'&&c.args.some(a=>a.includes('cron.launch_active_jobs = off')&&a.includes('/postgresql.auto.conf'))));
     assert(!target.commands.some(c=>c.args.some(a=>a.includes('TEST-ONLY-SENSITIVE'))));
     const config=fs.readFileSync(path.join(target.workspace,'supabase','config.toml'),'utf8');assert(config.includes('major_version = 17'));assert(config.includes(target.project));
     target.cleanup();assert.equal(target.resources.size,0);assert.equal(target.volumeExists,false);
