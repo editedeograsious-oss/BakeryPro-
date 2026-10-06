@@ -256,11 +256,22 @@
   "secret_values_included": false,
   "full_service_recovery_validated": false,
   "pending_private_review": [
-    "Auth Site URL and allowed redirect URLs",
+    "Independent verification of owner-reported saved Auth URLs and recovery behavior",
     "Auth providers, email confirmation/recovery configuration, SMTP settings and templates",
     "Separate private retention of backup passphrase, API/function/deployment secret values",
     "Actual Supabase provider-backup availability and retention",
     "External jobs, webhooks, payment integrations and other service configuration"
   ],
-  "final_cutover_approved": false
+  "final_cutover_approved": false,
+  "auth_configuration_review": {
+    "status": "owner_reported_url_update_not_independently_verified",
+    "reported_saved_at": "2026-10-07T00:32:46+03:00",
+    "previous_site_url_reported": "http://localhost:3000",
+    "site_url_reported_saved": "https://ds-bakery-web-production.up.railway.app",
+    "redirect_url_reported_added": "https://ds-bakery-web-production.up.railway.app/auth/callback?next=/reset-password",
+    "evidence_source": "Owner confirmation in chat: URLs saved",
+    "independent_dashboard_readback": false,
+    "email_delivery_tested": false,
+    "smtp_status": "not_yet_reviewed"
+  }
 }

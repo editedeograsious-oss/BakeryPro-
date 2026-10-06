@@ -19,6 +19,10 @@ Production database recovery passed in [run 37529519835, attempt 2](https://gith
 
 The function snapshots use `SUPABASE_URL` plus the platform key environment variables: `SUPABASE_PUBLISHABLE_KEYS`/`SUPABASE_SECRET_KEYS`, with legacy `SUPABASE_ANON_KEY`/`SUPABASE_SERVICE_ROLE_KEY` fallbacks. Keep credential values separately in approved private secret storage. The key names and source code do not back up the keys themselves. The existing imports use `npm:@supabase/supabase-js@2`; no dependency lockfile was returned by the deployed-function download.
 
+## Auth URL update reported
+
+On 2026-10-07 at 00:32 Uganda time, the Owner confirmed saving the production Site URL `https://ds-bakery-web-production.up.railway.app` and redirect `https://ds-bakery-web-production.up.railway.app/auth/callback?next=/reset-password`, after reporting the previous Site URL as `http://localhost:3000`. This records the Owner's confirmation; the connector cannot independently read these private settings. Email delivery, SMTP configuration and the complete recovery flow remain unverified. No email was sent and no live-operation control was changed by this checkpoint update.
+
 ## Remaining private settings review
 
 1. Open production [Auth → URL Configuration](https://supabase.com/dashboard/project/sgmmiymjnqqorvtvpigw/auth/url-configuration). Verify the Site URL is `https://ds-bakery-web-production.up.railway.app`. Verify allowed redirects cover the application's actual password-reset/invitation destination `https://ds-bakery-web-production.up.railway.app/auth/callback?next=/reset-password`. Record non-secret URLs only; do not copy tokens or passwords.
