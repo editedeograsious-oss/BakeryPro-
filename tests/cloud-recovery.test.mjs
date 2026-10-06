@@ -66,7 +66,9 @@ test('cloud wrapper encrypts mock outputs, suppresses secrets, blocks protected 
       ['protected',{TARGET_DATABASE_URL:url(production),TARGET_PROJECT_REF:production}],
       ['production-source',{DATABASE_URL:url(production),SOURCE_PROJECT_REF:production}],
       ['quiet-missing',{SOURCE_QUIET_CONFIRMED:'false'}],
-      ['short-password',{BACKUP_ENCRYPTION_PASSPHRASE:'short'}]
+      ['short-password',{BACKUP_ENCRYPTION_PASSPHRASE:'short'}],
+      ['temporary-not-hosted',{RESTORE_TARGET_KIND:'runner-local',TARGET_DATABASE_URL:'',TARGET_PROJECT_REF:'',GITHUB_ACTIONS:'false',RUNNER_ENVIRONMENT:'self-hosted'}],
+      ['temporary-hosted-url',{RESTORE_TARGET_KIND:'runner-local',GITHUB_ACTIONS:'true',RUNNER_ENVIRONMENT:'github-hosted'}]
     ]) {const result=run(name,override);assert.notEqual(result.status,0);assert(!fs.existsSync(commands));assert(!fs.existsSync(path.join(work,name)));assert(!result.stderr.includes('TEST-ONLY-PRIVATE-PASSWORD'));}
     let result=run('success');assert.equal(result.status,0,result.stderr);
     assert(!result.stdout.includes('TEST-ONLY-SENSITIVE'));assert(!result.stdout.includes('TEST-ONLY-PRIVATE-PASSWORD'));assert.equal(result.stderr,'');
@@ -78,5 +80,10 @@ test('cloud wrapper encrypts mock outputs, suppresses secrets, blocks protected 
     const privateLog=execFileSync('tar',['-xOzf',decrypted,'./private.log'],{encoding:'utf8'});assert(privateLog.includes('TEST-ONLY-SENSITIVE-LOG'));assert(privateLog.includes('TEST-ONLY-PRIVATE-PASSWORD'));
     result=run('failure',{CLOUD_TEST_IMPORT_FAIL:'1'});assert.notEqual(result.status,0);assert(!result.stdout.includes('TEST-ONLY-SENSITIVE'));
     const failed=JSON.parse(fs.readFileSync(path.join(work,'failure','result.json')));assert.equal(failed.status,'failed');assert.equal(failed.stage,'restore');assert.equal(failed.database_restore_compared,false);assert.equal(fs.readdirSync(privateBase).length,0);
+    result=run('temporary-setup-failure',{RESTORE_TARGET_KIND:'runner-local',TARGET_DATABASE_URL:'',TARGET_PROJECT_REF:'',GITHUB_ACTIONS:'true',RUNNER_ENVIRONMENT:'github-hosted'});
+    assert.notEqual(result.status,0);assert(!result.stdout.includes('TEST-ONLY-PRIVATE-PASSWORD'));assert(!result.stderr.includes('TEST-ONLY-SENSITIVE'));
+    const setupFailure=JSON.parse(fs.readFileSync(path.join(work,'temporary-setup-failure','result.json')));
+    assert.equal(setupFailure.stage,'temporary-target');assert.equal(setupFailure.database_restore_compared,false);assert.equal(setupFailure.backup_label,null);assert.equal(setupFailure.target_project_ref,null);assert.equal(setupFailure.temporary_target_removed,true);
+    assert.equal(fs.readdirSync(privateBase).length,0);
   } finally {fs.rmSync(work,{recursive:true,force:true});}
 });

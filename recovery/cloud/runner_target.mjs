@@ -36,7 +36,7 @@ export function targetPsqlArgs(id,args=[]) {
 }
 
 export function isolatedEntrypoint(entry,dataDirectory) {
-  if(!Array.isArray(entry)||entry.length<3||entry[0]!=='sh'||entry[1]!=='-c'||typeof entry[2]!=='string'||!entry[2]) throw Error('Unexpected bootstrap entrypoint');
+  if(!Array.isArray(entry)||entry.length<3||entry[0]!=='sh'||entry[1]!=='-c'||typeof entry[2]!=='string'||!entry[2]) throw Error('Unexpected bootstrap entrypoint (count='+entry?.length+', executable='+String(entry?.[0]).slice(0,30)+', flags='+String(entry?.[1]).slice(0,16)+', script_type='+typeof entry?.[2]+')');
   if(typeof dataDirectory!=='string'||!/^\/var\/lib\/postgresql\/data(?:\/[A-Za-z0-9_.-]+)*$/.test(dataDirectory)||dataDirectory.split('/').some(part=>part==='.'||part==='..')) throw Error('Database data directory is outside the fresh mounted volume');
   // Preserve the pinned CLI's startup script. The old container is stopped;
   // the replacement sets this in its fresh volume before starting PostgreSQL.
