@@ -24,6 +24,11 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && cp /tmp/production-fixes/SupplierAccountsPanel.tsx /app/site/components/operations/SupplierAccountsPanel.tsx \
   && cp /tmp/production-fixes/SupplierPaymentCorrections.tsx /app/site/components/finance/SupplierPaymentCorrections.tsx \
   && cp /tmp/production-fixes/supplier-accounts-page.tsx /app/site/app/supplier-accounts/page.tsx \
+  && cp /tmp/production-fixes/PayrollManager.tsx /app/site/components/finance/PayrollManager.tsx \
+  && cp /tmp/production-fixes/payroll-page.tsx /app/site/app/payroll/page.tsx \
+  && cp /tmp/production-fixes/ExpenseManager.tsx /app/site/components/operations/ExpenseManager.tsx \
+  && cp /tmp/production-fixes/ExpenseCorrectionActions.tsx /app/site/components/finance/ExpenseCorrectionActions.tsx \
+  && cp /tmp/production-fixes/expenses-page.tsx /app/site/app/expenses/page.tsx \
   && cp /tmp/production-fixes/RuntimeBanner.tsx /app/site/components/RuntimeBanner.tsx \
   && cp /tmp/production-fixes/login-page.tsx /app/site/app/login/page.tsx \
   && rm -rf /tmp/ds-bakery.zip /tmp/v038-patch.zip /tmp/staging-v038 /tmp/production-fixes
