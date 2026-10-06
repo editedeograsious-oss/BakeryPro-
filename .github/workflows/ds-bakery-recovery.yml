@@ -61,7 +61,7 @@ jobs:
         if: ${{ always() && steps.drill.outcome != 'skipped' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: ds-bakery-encrypted-recovery-${{ github.run_id }}
+          name: ds-bakery-encrypted-recovery-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: |
             recovery-results/recovery-bundle.enc
             recovery-results/recovery-bundle.enc.sha256

@@ -27,7 +27,7 @@ jobs:
       - name: Check out the reviewed recovery tools
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: 6626fb805324fd71ed6e583aed8bb347086daa91
+          ref: 8a0e1dd6a6667faf8a3cdd906dee824cdda96fbf
           persist-credentials: false
       - name: Install the pinned Supabase CLI
         shell: bash
@@ -55,13 +55,13 @@ jobs:
           RESTORE_CONFIRM: ${{ inputs.restore_confirmation }}
           SOURCE_QUIET_CONFIRMED: ${{ inputs.production_is_quiet }}
           CLOUD_RECOVERY_ARTIFACT_DIR: ${{ github.workspace }}/recovery-results
-          CLOUD_RECOVERY_CODE_SHA: 6626fb805324fd71ed6e583aed8bb347086daa91
+          CLOUD_RECOVERY_CODE_SHA: 8a0e1dd6a6667faf8a3cdd906dee824cdda96fbf
         run: node recovery/cloud/production.mjs
       - name: Retain only the encrypted archive and safe summary
         if: ${{ always() && steps.drill.outcome != 'skipped' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: ds-bakery-encrypted-production-recovery-${{ github.run_id }}
+          name: ds-bakery-encrypted-production-recovery-${{ github.run_id }}-attempt-${{ github.run_attempt }}
           path: |
             recovery-results/recovery-bundle.enc
             recovery-results/recovery-bundle.enc.sha256
