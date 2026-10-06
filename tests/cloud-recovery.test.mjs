@@ -6,7 +6,7 @@ import path from 'node:path';
 import {execFileSync,spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {checkPassphrase,encryptBundle,decryptBundle} from '../recovery/cloud/encrypted_bundle.mjs';
-import {recoveryFailureMessage} from '../recovery/cloud/run.mjs';
+import {recoveryFailureMessage,runCloudRecovery} from '../recovery/cloud/run.mjs';
 
 const repo=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const passphrase='TEST-ONLY-RANDOM-BACKUP-PASSPHRASE-2026';
@@ -18,6 +18,14 @@ test('unexpected setup errors never expose their private exception message',()=>
   const message=recoveryFailureMessage(Error('SECRET-URL-AND-PASSWORD-SHOULD-NOT-APPEAR'));
   assert(message.startsWith('Online recovery setup failed.'));
   assert(!message.includes('SECRET-URL-AND-PASSWORD-SHOULD-NOT-APPEAR'));
+});
+
+test('unreviewed source scope fails before any command and never exposes scope or URL',async()=>{
+  const env={BACKUP_ENCRYPTION_PASSPHRASE:passphrase,SOURCE_PROJECT_REF:production,DATABASE_URL:url(production)};
+  for(const scope of ['SECRET-UNREVIEWED-SOURCE','constructor','__proto__']) {
+    try {await runCloudRecovery(env,scope);assert.fail('Unexpected source scope accepted');}
+    catch(error) {const message=recoveryFailureMessage(error,'production');assert(message.includes('[SOURCE_PROJECT]'));assert(!message.includes('SECRET-'));assert(!message.includes('TEST-ONLY-PRIVATE-PASSWORD'));}
+  }
 });
 
 test('encrypted bundles round trip and use fresh randomness without exposing plaintext',async()=>{
@@ -90,6 +98,30 @@ test('cloud wrapper encrypts mock outputs, suppresses secrets, blocks protected 
       assert(!result.stderr.includes('TEST-ONLY-PRIVATE-PASSWORD'));assert(!result.stdout.includes('TEST-ONLY-PRIVATE-PASSWORD'));
       assert(!result.stderr.includes('SECRET-'));assert(!result.stderr.includes(work));
     }
+    const productionFixture=structuredClone(fixture);productionFixture.guards={environment_mode:'production',production_lock:true,operations_enabled:false};
+    const runProduction=(name,override={})=>spawnSync(process.execPath,[path.join(repo,'recovery/cloud/production.mjs')],{env:{...env,DATABASE_URL:url(production),SOURCE_PROJECT_REF:production,CLOUD_TEST_MANIFEST:JSON.stringify(productionFixture),CLOUD_RECOVERY_ARTIFACT_DIR:path.join(work,name),...override},encoding:'utf8'});
+    for(const [name,override,code] of [
+      ['production-wrong-source',{SOURCE_PROJECT_REF:staging,DATABASE_URL:url(staging)},'SOURCE_PROJECT'],
+      ['production-wrong-url',{DATABASE_URL:url(staging)},'SOURCE_CONNECTION'],
+      ['production-missing-url',{DATABASE_URL:''},'SOURCE_CONNECTION'],
+      ['production-target-production',{TARGET_DATABASE_URL:url(production),TARGET_PROJECT_REF:production},'HOSTED_TARGET'],
+      ['production-target-staging',{TARGET_DATABASE_URL:url(staging),TARGET_PROJECT_REF:staging},'HOSTED_TARGET'],
+      ['production-not-quiet',{SOURCE_QUIET_CONFIRMED:'false'},'MANUAL_CONFIRMATIONS']
+    ]) {
+      const blocked=runProduction(name,override);assert.notEqual(blocked.status,0);assert(!fs.existsSync(commands));
+      assert(blocked.stderr.includes('['+code+']'));assert(!blocked.stderr.includes('TEST-ONLY-PRIVATE-PASSWORD'));assert(!blocked.stdout.includes('TEST-ONLY-SENSITIVE'));
+      if(code==='SOURCE_CONNECTION') {assert(blocked.stderr.includes('BAKERY_PRODUCTION_DATABASE_URL'));assert(!blocked.stderr.includes('BAKERY_STAGING_DATABASE_URL'));}
+    }
+    let productionResult=runProduction('production-locked-success');assert.equal(productionResult.status,0,productionResult.stderr);
+    const productionSummary=JSON.parse(fs.readFileSync(path.join(work,'production-locked-success','result.json')));
+    assert.equal(productionSummary.source_project_ref,production);assert.equal(productionSummary.status,'passed');assert.equal(productionSummary.database_restore_compared,true);
+    assert(!productionResult.stdout.includes('TEST-ONLY-PRIVATE-PASSWORD'));assert(!productionResult.stdout.includes('TEST-ONLY-SENSITIVE'));assert.equal(productionResult.stderr,'');
+    const unlocked=structuredClone(productionFixture);unlocked.guards.production_lock=false;
+    productionResult=runProduction('production-unlocked',{CLOUD_TEST_MANIFEST:JSON.stringify(unlocked)});assert.notEqual(productionResult.status,0);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(work,'production-unlocked','result.json'))).database_restore_compared,false);
+    productionResult=runProduction('production-mislabelled',{CLOUD_TEST_MANIFEST:JSON.stringify(fixture)});assert.notEqual(productionResult.status,0);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(work,'production-mislabelled','result.json'))).database_restore_compared,false);
+    assert(!productionResult.stdout.includes('TEST-ONLY-PRIVATE-PASSWORD'));assert(!productionResult.stderr.includes('TEST-ONLY-SENSITIVE'));
     let result=run('success');assert.equal(result.status,0,result.stderr);
     assert(!result.stdout.includes('TEST-ONLY-SENSITIVE'));assert(!result.stdout.includes('TEST-ONLY-PRIVATE-PASSWORD'));assert.equal(result.stderr,'');
     const artifacts=path.join(work,'success');assert.deepEqual(fs.readdirSync(artifacts).sort(),['recovery-bundle.enc','recovery-bundle.enc.sha256','result.json']);

@@ -1,0 +1,29 @@
+# No database credentials or repository secrets are supplied to this job.
+name: DS Bakery production secret helper check
+on:
+  push:
+    branches: [ds-bakery-production-recovery-preflight]
+    paths:
+      - 'recovery/cloud/prepare-production-connection.ps1'
+      - 'tests/production-connection.test.ps1'
+      - '.github/workflows/ds-bakery-production-helper-preflight.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-secret-helper:
+    if: github.repository == 'editedeograsious-oss/BakeryPro-' && github.ref == 'refs/heads/ds-bakery-production-recovery-preflight'
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - name: Check out only the helper and fictional tests
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            recovery/cloud/prepare-production-connection.ps1
+            tests/production-connection.test.ps1
+          sparse-checkout-cone-mode: false
+      - name: Verify the helper on Windows PowerShell with fictional inputs
+        shell: powershell
+        run: .\tests\production-connection.test.ps1

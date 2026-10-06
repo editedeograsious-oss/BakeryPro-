@@ -1,0 +1,71 @@
+# Manual production-source drill. The source remains locked and operations OFF.
+# Restores only into the same reviewed empty isolated runner target.
+name: DS Bakery production recovery drill
+on:
+  workflow_dispatch:
+    inputs:
+      restore_confirmation:
+        description: Type RESTORE_TO_TEST_ONLY to restore into the temporary runner database
+        required: true
+        type: string
+      production_is_quiet:
+        description: No production writes are taking place during this backup
+        required: true
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: ds-bakery-production-recovery
+  cancel-in-progress: false
+jobs:
+  recovery:
+    if: github.repository == 'editedeograsious-oss/BakeryPro-' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out the reviewed recovery tools
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: REVIEWED_PRODUCTION_TOOLS_COMMIT
+          persist-credentials: false
+      - name: Install the pinned Supabase CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v node
+          command -v psql
+          docker info >/dev/null
+          tool_archive="$RUNNER_TEMP/supabase-cli.tar.gz"
+          curl --fail --silent --show-error --location \
+            https://github.com/supabase/cli/releases/download/v2.119.0/supabase_2.119.0_linux_amd64.tar.gz \
+            --output "$tool_archive"
+          printf '%s  %s\n' bf1c3ae93be98533eb8a3105dbf4564bd0b2d9dc24690d8a920f980ef975c1b4 "$tool_archive" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/bakery-tools"
+          tar -xzf "$tool_archive" -C "$RUNNER_TEMP/bakery-tools" supabase
+          echo "$RUNNER_TEMP/bakery-tools" >> "$GITHUB_PATH"
+      - name: Export, restore and compare privately
+        id: drill
+        shell: bash
+        env:
+          DATABASE_URL: ${{ secrets.BAKERY_PRODUCTION_DATABASE_URL }}
+          BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BAKERY_BACKUP_PASSPHRASE }}
+          SOURCE_PROJECT_REF: sgmmiymjnqqorvtvpigw
+          RESTORE_TARGET_KIND: runner-local
+          RESTORE_CONFIRM: ${{ inputs.restore_confirmation }}
+          SOURCE_QUIET_CONFIRMED: ${{ inputs.production_is_quiet }}
+          CLOUD_RECOVERY_ARTIFACT_DIR: ${{ github.workspace }}/recovery-results
+          CLOUD_RECOVERY_CODE_SHA: REVIEWED_PRODUCTION_TOOLS_COMMIT
+        run: node recovery/cloud/production.mjs
+      - name: Retain only the encrypted archive and safe summary
+        if: ${{ always() && steps.drill.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ds-bakery-encrypted-production-recovery-${{ github.run_id }}
+          path: |
+            recovery-results/recovery-bundle.enc
+            recovery-results/recovery-bundle.enc.sha256
+            recovery-results/result.json
+          if-no-files-found: ignore
+          retention-days: 7
+          include-hidden-files: false
