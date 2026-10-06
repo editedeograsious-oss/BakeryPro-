@@ -15,6 +15,10 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && cat /tmp/staging-v038/part-*.b64 | tr -d '\n\r' | base64 -d > /tmp/v038-patch.zip \
   && test "$(sha256sum /tmp/v038-patch.zip | awk '{print $1}')" = "7571746afe8691782e113ceebaa02f9292da9e8a75cfa26106bffdcce137016a" \
   && unzip -qo /tmp/v038-patch.zip -d /app/site \
+  && cp /tmp/production-fixes/launchReadiness.ts /app/site/lib/integration/launchReadiness.ts \
+  && cp /tmp/production-fixes/dashboard-page.tsx /app/site/app/dashboard/page.tsx \
+  && cp /tmp/production-fixes/system-status-page.tsx /app/site/app/system-status/page.tsx \
+  && cp /tmp/production-fixes/LaunchValidationPanel.tsx /app/site/components/validation/LaunchValidationPanel.tsx \
   && mkdir -p /app/site/app/api/staff/create \
   && mkdir -p /app/site/app/api/staff/invite \
   && cp /tmp/production-fixes/staff-invite-route.ts /app/site/app/api/staff/invite/route.ts \
