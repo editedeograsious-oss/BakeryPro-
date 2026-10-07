@@ -1,0 +1,319 @@
+{
+  "format_version": 1,
+  "scope": "service_inventory_only",
+  "source_project_ref": "sgmmiymjnqqorvtvpigw",
+  "observed_at": "2026-10-06T21:13:32.86531+00:00",
+  "guards": {
+    "production_lock": true,
+    "environment_mode": "production",
+    "operations_enabled": false
+  },
+  "database_recovery": {
+    "workflow_run_id": 37529519835,
+    "run_attempt": 2,
+    "workflow_url": "https://github.com/editedeograsious-oss/BakeryPro-/actions/runs/37529519835",
+    "tools_commit": "8a0e1dd6a6667faf8a3cdd906dee824cdda96fbf",
+    "status": "passed",
+    "scope": "database_only",
+    "completed_at": "2026-10-06T20:57:21.706Z",
+    "backup_label": "ds_bakery_20261006T205550Z_xOrRrM",
+    "original_archive_sha256": "2ecb6b3828f84789d8c402e46f18c9c9e4b50c20827efac7727be385212ecfca",
+    "encrypted_bundle_sha256": "3c0c113669e1be798f562b0658678f58a3ca55b6465adfce9a637e6a8983c62f",
+    "downloaded_zip_sha256": "f06db5535dc51791040716e505dd30d9df7eac9695c7f9841d31cd06aeef1349",
+    "github_artifact_id": 11444575317,
+    "retained_encrypted_file": "DS_Bakery_Production_Recovery_20261006_Verified.zip",
+    "database_restore_compared": true,
+    "temporary_target_removed": true,
+    "go_live_backup_gate": "pass",
+    "archive_evidence_ready": true,
+    "restore_drill_passed": true,
+    "matching_evidence_event_count": 3
+  },
+  "edge_functions": [
+    {
+      "slug": "invite-staff",
+      "id": "9998320e-0652-494a-b5d1-e4e4fcfb4e18",
+      "status": "ACTIVE",
+      "version": 4,
+      "verify_jwt": false,
+      "import_map": false,
+      "deployed_bundle_sha256": "6c18cfc414f063e827eed1ab2cbe864991c16709c6794d0e8e048a6e095a1d6a",
+      "source_path": "recovery/services/supabase-functions/invite-staff/index.ts",
+      "source_sha256": "b6fbfb945d0ae98eaf2c8c1d0c43f7d5ecbae715aadd623b8ffc962e6c8b19e8",
+      "source_bytes": 4474
+    },
+    {
+      "slug": "create-staff-account",
+      "id": "5885eae1-deb1-4e30-852d-4f972e9672ec",
+      "status": "ACTIVE",
+      "version": 2,
+      "verify_jwt": false,
+      "import_map": false,
+      "deployed_bundle_sha256": "ed2d14a9ceff46c11397a70b685129b86ad60d078f63cd17d2edf7c216af7d09",
+      "source_path": "recovery/services/supabase-functions/create-staff-account/index.ts",
+      "source_sha256": "3994bab7dd3c13cbdd4a2a89f6e97f8b3928be985e27fa79707c3f74647804b9",
+      "source_bytes": 3907
+    },
+    {
+      "slug": "manage-staff-account",
+      "id": "00680311-55ff-408c-b46e-171ca65bf13f",
+      "status": "ACTIVE",
+      "version": 2,
+      "verify_jwt": false,
+      "import_map": false,
+      "deployed_bundle_sha256": "09d4a393b7eefcf061fe21b11d60c5429e1d19615c6ee2170adde11424bcbad7",
+      "source_path": "recovery/services/supabase-functions/manage-staff-account/index.ts",
+      "source_sha256": "463a24f5f70eecf454006aa292526213cb04180072d02662cff7796545c3d831",
+      "source_bytes": 7200
+    }
+  ],
+  "database_service_inventory": {
+    "extensions": [
+      {
+        "name": "pg_stat_statements",
+        "version": "1.11"
+      },
+      {
+        "name": "pgcrypto",
+        "version": "1.3"
+      },
+      {
+        "name": "plpgsql",
+        "version": "1.0"
+      },
+      {
+        "name": "supabase_vault",
+        "version": "0.3.1"
+      },
+      {
+        "name": "uuid-ossp",
+        "version": "1.1"
+      }
+    ],
+    "cron_job_count": null,
+    "vault_secret_count": 0,
+    "storage_bucket_count": 1,
+    "storage_object_count": 0,
+    "active_cron_job_count": null,
+    "realtime_publications": [
+      {
+        "name": "supabase_realtime",
+        "all_tables": false,
+        "table_count": 0
+      }
+    ],
+    "auth_providers_in_existing_users": [
+      {
+        "provider": "email",
+        "user_count": 2
+      }
+    ]
+  },
+  "storage": {
+    "buckets": [
+      {
+        "id": "custom-cake-references",
+        "name": "custom-cake-references",
+        "public": false,
+        "file_size_limit": null,
+        "allowed_mime_types": null
+      }
+    ],
+    "pg_cron_installed": false,
+    "storage_policy_count": 4,
+    "policies": [
+      {
+        "name": "ds bakery custom cake delete",
+        "roles": [
+          "public"
+        ],
+        "table": "objects",
+        "using": "((bucket_id = 'custom-cake-references'::text) AND (current_staff_role() = ANY (ARRAY['owner'::staff_role, 'manager'::staff_role])))",
+        "schema": "storage",
+        "command": "DELETE",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "name": "ds bakery custom cake read",
+        "roles": [
+          "public"
+        ],
+        "table": "objects",
+        "using": "((bucket_id = 'custom-cake-references'::text) AND (current_staff_role() = ANY (ARRAY['owner'::staff_role, 'manager'::staff_role, 'cashier'::staff_role, 'baker'::staff_role])))",
+        "schema": "storage",
+        "command": "SELECT",
+        "permissive": "PERMISSIVE",
+        "with_check": null
+      },
+      {
+        "name": "ds bakery custom cake update",
+        "roles": [
+          "public"
+        ],
+        "table": "objects",
+        "using": "((bucket_id = 'custom-cake-references'::text) AND (current_staff_role() = ANY (ARRAY['owner'::staff_role, 'manager'::staff_role, 'cashier'::staff_role])))",
+        "schema": "storage",
+        "command": "UPDATE",
+        "permissive": "PERMISSIVE",
+        "with_check": "((bucket_id = 'custom-cake-references'::text) AND (current_staff_role() = ANY (ARRAY['owner'::staff_role, 'manager'::staff_role, 'cashier'::staff_role])))"
+      },
+      {
+        "name": "ds bakery custom cake upload",
+        "roles": [
+          "public"
+        ],
+        "table": "objects",
+        "using": null,
+        "schema": "storage",
+        "command": "INSERT",
+        "permissive": "PERMISSIVE",
+        "with_check": "((bucket_id = 'custom-cake-references'::text) AND (current_staff_role() = ANY (ARRAY['owner'::staff_role, 'manager'::staff_role, 'cashier'::staff_role])))"
+      }
+    ]
+  },
+  "railway": {
+    "service": {
+      "id": "90a6f440-61e5-4b10-bcaa-0560da9dcce5",
+      "name": "Ds-Bakery-Web",
+      "state": "live"
+    },
+    "environment": {
+      "id": "9e5aae00-7e70-4af0-9853-4ac8486e1614",
+      "name": "production"
+    },
+    "staged": null,
+    "config": {
+      "source": {
+        "repo": "editedeograsious-oss/BakeryPro-",
+        "branch": "ds-bakery-master-v0.38-production",
+        "commitSha": "8e66b0d66992ef2cac2349a0052846e9e8df1768"
+      },
+      "networking": {
+        "serviceDomains": {
+          "ds-bakery-web-production.up.railway.app": {
+            "port": 3000
+          }
+        },
+        "privateNetworkEndpoint": "ds-bakery-web"
+      },
+      "build": {
+        "builder": "DOCKERFILE",
+        "buildEnvironment": "V3",
+        "dockerfilePath": "Dockerfile"
+      },
+      "deploy": {
+        "healthcheckPath": "/api/health",
+        "healthcheckTimeout": 120,
+        "restartPolicyMaxRetries": 3,
+        "useLegacyStacker": false,
+        "ipv6EgressEnabled": false,
+        "runtime": "V2",
+        "multiRegionConfig": {
+          "sfo": {
+            "numReplicas": 1
+          }
+        }
+      }
+    },
+    "stagedChanges": [],
+    "variableNames": [
+      "DATABASE_URL",
+      "JWT_EXPIRES_IN",
+      "NEXT_PUBLIC_DEMO_MODE",
+      "NEXT_PUBLIC_DEPLOYMENT_ENV",
+      "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "NEXT_PUBLIC_SUPABASE_URL",
+      "NODE_ENV",
+      "PAYMENTS_MODE",
+      "PORT"
+    ],
+    "volumes": [],
+    "domains": {
+      "serviceDomains": [
+        {
+          "id": "0e3b1867-802c-4034-9f10-c58eba2b16b8",
+          "domain": "ds-bakery-web-production.up.railway.app",
+          "targetPort": 3000
+        }
+      ],
+      "customDomains": []
+    },
+    "tcpProxies": [],
+    "latestDeployment": {
+      "id": "e4e22700-32c5-45e2-b109-a4d32c17cde2",
+      "status": "SUCCESS",
+      "createdAt": "2026-10-07T12:20:51.649Z",
+      "url": null
+    },
+    "tracing": {
+      "tracingEnabled": false,
+      "autoInstrumentationEnabled": false,
+      "autoInstrumentationActive": false
+    }
+  },
+  "secret_values_included": false,
+  "full_service_recovery_validated": false,
+  "pending_private_review": [
+    "Independent verification of owner-reported saved Auth URLs and recovery behavior",
+    "Validate reported SMTP delivery with an existing account, then review password recovery, Auth providers and templates",
+    "Separate private retention of backup passphrase, API/function/deployment secret values",
+    "Actual Supabase provider-backup availability and retention",
+    "External jobs, webhooks, payment integrations and other service configuration"
+  ],
+  "final_cutover_approved": false,
+  "auth_configuration_review": {
+    "status": "urls_and_smtp_reported_saved_email_delivery_unverified",
+    "reported_saved_at": "2026-10-07T00:32:46+03:00",
+    "previous_site_url_reported": "http://localhost:3000",
+    "site_url_reported_saved": "https://ds-bakery-web-production.up.railway.app",
+    "redirect_url_reported_added": "https://ds-bakery-web-production.up.railway.app/auth/callback?next=/reset-password",
+    "evidence_source": "Owner confirmation in chat: URLs saved",
+    "independent_dashboard_readback": false,
+    "email_delivery_tested": false,
+    "smtp_status": "owner_reported_saved_not_independently_read_back",
+    "custom_smtp_enabled": null,
+    "smtp_evidence": {
+      "source": "Owner-provided production Supabase SMTP screenshot",
+      "observed_at": "2026-10-07T00:38:31+03:00",
+      "project_ref": "sgmmiymjnqqorvtvpigw",
+      "custom_smtp_enabled": false,
+      "email_delivery_tested": false
+    },
+    "staff_account_creation_requires_email_delivery": false,
+    "staff_account_creation_evidence": "Captured deployed create-staff-account source uses Auth admin createUser with email_confirm=true, without inviteUserByEmail.",
+    "last_screenshot_custom_smtp_enabled": false,
+    "custom_smtp_enabled_reported": true,
+    "smtp_saved_reported_at": "2026-10-07T00:52:44+03:00",
+    "smtp_configuration_reported": {
+      "provider": "gmail",
+      "host": "smtp.gmail.com",
+      "port": 587,
+      "sender_name": "DS Bakery",
+      "custom_domain_owned": false,
+      "sender_email_and_username_included": false,
+      "credential_values_included": false,
+      "evidence_source": "Owner confirmation in chat: SMTP saved, following the provided Gmail SMTP setup"
+    },
+    "password_recovery_flow_tested": false,
+    "validation_preflight": {
+      "observed_at": "2026-10-06T21:54:12.237882+00:00",
+      "auth_user_count": 2,
+      "active_staff_count": 1,
+      "existing_active_owner_available": true
+    }
+  },
+  "railway_observed_at": "2026-10-07T13:00:17.505Z",
+  "opening_setup_change": {
+    "verified_at": "2026-10-07T13:00:17.505Z",
+    "production_runtime_commit": "8e66b0d66992ef2cac2349a0052846e9e8df1768",
+    "deployment_id": "e4e22700-32c5-45e2-b109-a4d32c17cde2",
+    "drafts_only": true,
+    "actual_business_rows_imported": false,
+    "stock_financial_totals_unchanged": true,
+    "production_lock": true,
+    "operations_enabled": false,
+    "smtp_delivery_verified": false,
+    "backup_refresh_required_after_opening_import": true
+  }
+}
