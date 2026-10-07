@@ -173,7 +173,6 @@
     ]
   },
   "railway": {
-    "project_id": "da00644b-85f5-45c4-903e-2c264378cd1c",
     "service": {
       "id": "90a6f440-61e5-4b10-bcaa-0560da9dcce5",
       "name": "Ds-Bakery-Web",
@@ -188,7 +187,7 @@
       "source": {
         "repo": "editedeograsious-oss/BakeryPro-",
         "branch": "ds-bakery-master-v0.38-production",
-        "commitSha": "8cb481e37edf197787daa6d0e89201afcd1bd0e2"
+        "commitSha": "8e66b0d66992ef2cac2349a0052846e9e8df1768"
       },
       "networking": {
         "serviceDomains": {
@@ -242,9 +241,9 @@
     },
     "tcpProxies": [],
     "latestDeployment": {
-      "id": "3e6896f4-4b56-4722-943c-433dd1dad3cb",
+      "id": "e4e22700-32c5-45e2-b109-a4d32c17cde2",
       "status": "SUCCESS",
-      "createdAt": "2026-10-06T10:34:15.056Z",
+      "createdAt": "2026-10-07T12:20:51.649Z",
       "url": null
     },
     "tracing": {
@@ -303,5 +302,18 @@
       "active_staff_count": 1,
       "existing_active_owner_available": true
     }
+  },
+  "railway_observed_at": "2026-10-07T13:00:17.505Z",
+  "opening_setup_change": {
+    "verified_at": "2026-10-07T13:00:17.505Z",
+    "production_runtime_commit": "8e66b0d66992ef2cac2349a0052846e9e8df1768",
+    "deployment_id": "e4e22700-32c5-45e2-b109-a4d32c17cde2",
+    "drafts_only": true,
+    "actual_business_rows_imported": false,
+    "stock_financial_totals_unchanged": true,
+    "production_lock": true,
+    "operations_enabled": false,
+    "smtp_delivery_verified": false,
+    "backup_refresh_required_after_opening_import": true
   }
 }
