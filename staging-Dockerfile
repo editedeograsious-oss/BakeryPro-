@@ -36,6 +36,7 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && mkdir -p /app/site/app/api/staff/create /app/site/app/api/staff/invite \
   && cp /tmp/production-fixes/staff-invite-route.ts /app/site/app/api/staff/invite/route.ts \
   && cp /tmp/production-fixes/staff-create-route.ts /app/site/app/api/staff/create/route.ts \
+  && cp /tmp/production-fixes/staging-StaffAdminManager.tsx /app/site/components/admin/StaffAdminManager.tsx \
   && mkdir -p /app/site/app/opening-balances \
   && cp /tmp/production-fixes/OpeningBalancesManager.tsx /app/site/components/validation/OpeningBalancesManager.tsx \
   && cp /tmp/production-fixes/opening-balances-page.tsx /app/site/app/opening-balances/page.tsx \
