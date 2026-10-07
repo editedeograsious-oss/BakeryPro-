@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ugx } from "@/lib/costing";
 
-export default function CreditPaymentCorrections({live,canCorrect}:{live:boolean;canCorrect:boolean}){
+export default function CreditPaymentCorrections({live,canCorrect,canPostTransactions=true}:{live:boolean;canCorrect:boolean;canPostTransactions?:boolean}){
   const router=useRouter();
   const [rows,setRows]=useState<any[]>([]);
   const [message,setMessage]=useState("");
@@ -26,6 +26,7 @@ export default function CreditPaymentCorrections({live,canCorrect}:{live:boolean
   useEffect(()=>{void load();},[live]);
 
   async function reverse(row:any){
+    if(!canCorrect||!canPostTransactions||!live)return;
     const why=window.prompt("Reason for reversing this credit repayment:");
     if(!why?.trim())return;
     if(!window.confirm("Reverse this repayment? The customer's outstanding credit will increase again."))return;
@@ -42,6 +43,7 @@ export default function CreditPaymentCorrections({live,canCorrect}:{live:boolean
   }
 
   async function restore(row:any){
+    if(!canCorrect||!canPostTransactions||!live)return;
     const why=window.prompt("Reason for restoring this credit repayment:");
     if(!why?.trim())return;
     setBusy(true);setMessage("");
@@ -70,8 +72,8 @@ export default function CreditPaymentCorrections({live,canCorrect}:{live:boolean
         <td>{r.reference??"—"}</td>
         <td>{r.reversed_at?<span className="badge red">REVERSED</span>:<span className="badge green">ACTIVE</span>}</td>
         <td>{!canCorrect?<span>—</span>:r.reversed_at
-          ?<button className="btn primary" disabled={busy} onClick={()=>restore(r)}>Restore</button>
-          :<button className="btn secondary" disabled={busy} onClick={()=>reverse(r)}>Reverse / Delete</button>}
+          ?<button className="btn primary" disabled={busy||!canPostTransactions} onClick={()=>restore(r)}>Restore</button>
+          :<button className="btn secondary" disabled={busy||!canPostTransactions} onClick={()=>reverse(r)}>Reverse / Delete</button>}
         </td>
       </tr>)}</tbody>
     </table></div>

@@ -68,6 +68,15 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && node /tmp/production-fixes/clean-mojibake.js /app/site \
   && cp /app/site/public/ds-bakery-logo.png /app/site/app/icon.png \
   && cp /app/site/public/ds-bakery-logo.png /app/site/app/apple-icon.png \
+  && cp /tmp/production-fixes/GoLiveSetupManager.tsx /app/site/components/validation/GoLiveSetupManager.tsx \
+  && cp /tmp/production-fixes/validate_project.mjs /app/site/scripts/validate_project.mjs \
+  && mkdir -p /app/site/app/opening-balances \
+  && cp /tmp/production-fixes/OpeningBalancesManager.tsx /app/site/components/validation/OpeningBalancesManager.tsx \
+  && cp /tmp/production-fixes/opening-balances-page.tsx /app/site/app/opening-balances/page.tsx \
+  && cp /tmp/production-fixes/CustomerManager.tsx /app/site/components/service/CustomerManager.tsx \
+  && cp /tmp/production-fixes/customers-page.tsx /app/site/app/customers/page.tsx \
+  && cp /tmp/production-fixes/InventoryManager.tsx /app/site/components/core/InventoryManager.tsx \
+  && cp /tmp/production-fixes/inventory-page.tsx /app/site/app/inventory/page.tsx \
   && rm -rf /tmp/ds-bakery.zip /tmp/v038-patch.zip /tmp/staging-v038 /tmp/production-fixes
 
 WORKDIR /app/site

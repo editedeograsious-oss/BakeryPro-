@@ -70,6 +70,7 @@ const sections:MenuSection[]=[
   ]},
   {title:"Website",items:[{href:"/public-site-settings",label:"Public Website Settings",roles:ownerManager}]},
   {title:"Data Management",items:[{href:"/recycle-bin",label:"Recycle Bin",roles:ownerManager}]},
+  {title:"Opening Setup",items:[{href:"/opening-balances",label:"Opening Stock & Customer Debts",roles:ownerManager}]},
 ];
 
 const systemItems:MenuItem[]=[
