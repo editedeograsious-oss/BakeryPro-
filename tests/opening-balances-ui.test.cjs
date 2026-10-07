@@ -1,0 +1,48 @@
+const assert=require('node:assert/strict');
+const {harness,text,find,button}=require('./ui-harness.cjs');
+const field=(tree,id)=>find(tree,n=>n.props?.id===id)[0];
+const set=(ui,id,value)=>{field(ui.render(),id).props.onChange({target:{value}});};
+
+async function main(){
+  const calls=[];const client={rpc:async(name,params)=>{calls.push({name,params});return {data:'draft-1',error:null};}};
+  globalThis.window={scrollTo(){},prompt:()=> 'Verified correction'};
+  const status={editable:true,can_prepare_stock:true,can_prepare_credit:true,business_date:'2026-10-07'};
+  const props={live:true,status,drafts:[],materials:[{id:'flour',name:'Flour',base_unit:'kg'}],products:[{id:'bread',name:'Bread'}],customers:[{id:'customer',full_name:'Customer'}]};
+  const ui=harness('OpeningBalancesManager.tsx',props,client);
+  set(ui,'opening-subject','flour');set(ui,'opening-quantity','25.5');set(ui,'opening-cost','4000');
+  await button(ui.render(),'Save Opening Draft').props.onClick();
+  assert.equal(calls.length,1);assert.equal(calls[0].name,'save_opening_balance_draft');
+  assert.equal(calls[0].params.p_quantity,25.5);assert.equal(calls[0].params.p_balance_due,null);
+  assert(text(ui.render()).includes('Live stock, customer balances, sales and cash are unchanged.'));
+  set(ui,'opening-kind','customer_credit');set(ui,'opening-subject','customer');set(ui,'opening-balance','60000');set(ui,'opening-due','2026-10-01');
+  await button(ui.render(),'Save Opening Draft').props.onClick();
+  assert.equal(calls[1].params.p_balance_due,60000);assert.equal(calls[1].params.p_quantity,null);assert.equal(calls[1].params.p_unit_cost,null);
+  assert.equal(calls[1].params.p_due_date,'2026-10-01');
+  set(ui,'opening-kind','finished_goods');set(ui,'opening-subject','bread');set(ui,'opening-quantity','1.5');set(ui,'opening-cost','2500');
+  await button(ui.render(),'Save Opening Draft').props.onClick();
+  assert.equal(calls.length,2);assert(text(ui.render()).includes('Enter whole pieces'));
+  const draft={id:'draft',kind:'customer_credit',customer_id:'customer',balance_due:50000,as_of_date:'2026-10-07',version:3,customers:{full_name:'Customer'}};
+  let tree=ui.render({...props,drafts:[draft,{...draft,id:'voided',balance_due:90000,voided_at:'2026-10-07'}]});
+  const debtStat=find(tree,n=>n.props?.className==='card stat'&&text(n).includes('Draft Customer Debts'))[0];
+  assert(text(debtStat).includes('UGX 50,000'));assert(!text(debtStat).includes('140,000'),'Voided drafts are excluded');
+  await button(tree,'Edit').props.onClick();
+  set(ui,'opening-balance','55000');await button(ui.render(),'Save Draft Changes').props.onClick();
+  assert.equal(calls.at(-1).params.p_draft_id,'draft');assert.equal(calls.at(-1).params.p_expected_version,3);
+  await button(ui.render(),'Void').props.onClick();assert.equal(calls.at(-1).name,'set_opening_draft_voided');assert.equal(calls.at(-1).params.p_voided,true);
+  await button(ui.render(),'Restore').props.onClick();assert.equal(calls.at(-1).params.p_voided,false);
+  const locked=harness('OpeningBalancesManager.tsx',{...props,status:{...status,editable:false,reason:'Setup completed'}},client);
+  const before=calls.length;tree=locked.render();assert(button(tree,'Save Opening Draft').props.disabled);
+  await button(tree,'Save Opening Draft').props.onClick();assert.equal(calls.length,before);
+  const denied=harness('OpeningBalancesManager.tsx',{...props,status:{...status,can_prepare_stock:false,can_prepare_credit:false}},client);
+  assert(button(denied.render(),'Save Opening Draft').props.disabled);
+  const customer=harness('CustomerManager.tsx',{live:true,canPrepareOpening:true,customers:[{customer_id:'c',full_name:'Customer',outstanding_balance:20000,credit_balance_due:50000,total_outstanding_balance:70000}]},client,{'@/components/admin/RecycleActionButton':()=>null});
+  tree=customer.render();const balanceStat=find(tree,n=>n.props?.className==='card stat'&&text(n).includes('Outstanding Balances'))[0];
+  assert(text(balanceStat).includes('UGX 70,000'),'Customer totals include orders and Credit Book');
+  const restricted=harness('CustomerManager.tsx',{live:true,canReadCredit:false,customers:[{customer_id:'c',full_name:'Customer',outstanding_balance:20000,credit_balance_due:50000,total_outstanding_balance:70000}]},client,{'@/components/admin/RecycleActionButton':()=>null});
+  tree=restricted.render();assert(text(tree).includes('Restricted'));assert(!text(tree).includes('50,000')&&!text(tree).includes('70,000'),'Restricted credit is not disclosed');
+  const book=harness('CreditBookManager.tsx',{live:true,canSetTerms:true,canPostTransactions:false,accounts:[{customer_id:'c',full_name:'Customer',balance_due:50000}],ledger:[]},client);
+  tree=book.render();assert(button(tree,'Record Credit Payment').props.disabled);
+  await button(tree,'Record Credit Payment').props.onClick();assert.equal(calls.length,before);
+  console.log('PASS: opening draft entry, debt vs stock fields, correction controls, void totals, permissions, customer totals and locked repayments.');
+}
+main().catch(e=>{console.error(e);process.exitCode=1;});
