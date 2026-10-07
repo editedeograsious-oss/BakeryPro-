@@ -8,7 +8,7 @@ One draft per stock item or customer prevents duplicate opening records. Identic
 
 Register materials/products and customer profiles before selecting them in the opening screen. Record stock in its base unit and use cost rather than selling price. Record only the amount still owed after earlier customer payments; preparing an old debt does not enable new credit. New supplier deliveries use Purchases and Receiving, separately from the opening snapshot, once operations are explicitly approved.
 
-The Customers page now shows order debt, Credit Book debt and the combined amount separately. The original order-only view fields remain compatible with other modules. Restricted credit balances are not disclosed. Credit repayments and corrections now obey the normal operation gate at both credit ledger and allocation tables. A separate migration brings staging's repayment-void constraint into line with production.
+The Customers page now shows order debt, Credit Book debt and the combined amount separately. The original order-only view fields remain compatible with other modules. Restricted credit balances are not disclosed. Individual credit-read restrictions also hide opening debts and block their preparation; denied inventory-write access blocks draft edits while preserving authorized stock viewing. Raw-material viewing follows the installed role rules, since the database catalogue has no `inventory:read` key. Credit repayments and corrections now obey the normal operation gate at both credit ledger and allocation tables. A separate migration brings staging's repayment-void constraint into line with production.
 
 ## Validation
 
@@ -18,7 +18,7 @@ The Customers page now shows order debt, Credit Book debt and the combined amoun
 - `npm run release:check` passed: structure, current v0.38 validator, syntax, types and production build.
 - The validation script now recognizes v0.38 and checks the authenticated Edge Function staff route boundary already used by production.
 
-Deployment evidence will be recorded after both hosted builds settle. No actual business rows have been supplied or imported yet. SMTP delivery verification remains pending from the previous task.
+Production deployment `e4e22700-32c5-45e2-b109-a4d32c17cde2` is SUCCESS for commit `8e66b0d66992ef2cac2349a0052846e9e8df1768`. Stock, financial totals and business record counts match the before-change snapshot. Production Lock remains on, setup incomplete and operations off. Staging deployment evidence will be finalized after the small staff-client authentication compatibility update settles. No actual business rows have been supplied or imported yet. SMTP delivery verification remains pending from the previous task. Refresh the database backup after the opening import and before an approved cutover.
 
 ## Information to collect privately
 

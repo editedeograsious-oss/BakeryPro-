@@ -140,6 +140,32 @@ begin
   perform public.set_opening_draft_voided(current_setting('test.opening_stock_draft')::uuid,true,'Manager correction',4);
   perform public.set_opening_draft_voided(current_setting('test.opening_stock_draft')::uuid,false,'Manager restore',5);
 end $manager$;
+select set_config('request.jwt.claim.sub',current_setting('test.opening_owner'),true);
+select public.set_staff_permission_override(current_setting('test.opening_manager')::uuid,'credit:read',false,'Rollback opening permission test');
+select set_config('request.jwt.claim.sub',current_setting('test.opening_manager'),true);
+do $credit_override$
+declare v_denied boolean:=false;
+begin
+  if exists(select 1 from public.opening_balance_drafts where kind='customer_credit') then
+    raise exception 'A denied credit-read override must hide opening debts';
+  end if;
+  if (public.opening_draft_setup_status()->>'can_prepare_credit')::boolean then raise exception 'Denied credit-read override must disable preparation'; end if;
+  begin perform public.save_opening_balance_draft(null,'customer_credit',current_setting('test.opening_customer')::uuid,public.business_current_date(),null,null,10,null,null,null,gen_random_uuid(),null);
+  exception when raise_exception then v_denied:=sqlerrm like 'Not authorized to prepare customer credit%'; end;
+  if not v_denied then raise exception 'Denied credit read must also reject draft writes'; end if;
+end $credit_override$;
+select set_config('request.jwt.claim.sub',current_setting('test.opening_owner'),true);
+select public.set_staff_permission_override(current_setting('test.opening_manager')::uuid,'inventory:write',false,'Rollback opening permission test');
+select set_config('request.jwt.claim.sub',current_setting('test.opening_manager'),true);
+do $stock_override$
+declare v_denied boolean:=false;
+begin
+  if not exists(select 1 from public.opening_balance_drafts where kind='raw_material') then raise exception 'A write restriction must preserve authorized stock viewing'; end if;
+  if (public.opening_draft_setup_status()->>'can_prepare_stock')::boolean then raise exception 'Denied inventory write must disable preparation'; end if;
+  begin perform public.save_opening_balance_draft(null,'raw_material',current_setting('test.opening_material')::uuid,public.business_current_date(),10,4000,null,null,null,null,gen_random_uuid(),null);
+  exception when raise_exception then v_denied:=sqlerrm like 'Not authorized to prepare opening stock%'; end;
+  if not v_denied then raise exception 'Denied stock write must reject opening draft writes'; end if;
+end $stock_override$;
 select set_config('request.jwt.claim.sub',current_setting('test.opening_cashier'),true);
 do $cashier$
 declare v_denied boolean:=false;
@@ -209,7 +235,7 @@ end $locked$;
 select jsonb_build_object('result','PASS','verified',array[
   'drafts leave live stock and finance unchanged','duplicate and changed-request rejection',
   'edit with version check','void and restore','unposted drafts block completion',
-  'Owner and Manager access','Cashier and anonymous denial','direct writes denied',
+  'Owner and Manager access','individual permission overrides','Cashier and anonymous denial','direct writes denied',
   'Customers and Credit Book balances agree through repayment void and restore',
   'locked prelaunch production accepts only opening drafts','locked production rejects credit transactions','completed setup freezes drafts'
 ]) as result;
