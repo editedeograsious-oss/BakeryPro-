@@ -76,7 +76,7 @@ ENV NEXT_PUBLIC_DEMO_MODE=$NEXT_PUBLIC_DEMO_MODE
 
 RUN npm install
 RUN npm audit --audit-level=moderate
-RUN node --test tests/*.test.cjs tests/*.test.mjs
+RUN node --test tests/*.test.cjs tests/*.test.mjs && rm -rf tests recovery production-fixes
 RUN npm run build
 RUN npm prune --omit=dev
 
