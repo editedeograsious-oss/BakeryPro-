@@ -30,7 +30,7 @@ export default function RuntimeBanner() {
       }}
     >
       <span>{text}</span>
-      <Link href="/system-status" style={{ textDecoration: "underline" }}>
+      <Link prefetch={false} href="/system-status" style={{ textDecoration: "underline" }}>
         System status
       </Link>
     </div>
