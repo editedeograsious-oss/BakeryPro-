@@ -48,6 +48,10 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && cp /tmp/production-fixes/CreditBookManager.tsx /app/site/components/finance/CreditBookManager.tsx \
   && cp /tmp/production-fixes/CreditPaymentCorrections.tsx /app/site/components/finance/CreditPaymentCorrections.tsx \
   && cp /tmp/production-fixes/credit-book-page.tsx /app/site/app/credit-book/page.tsx \
+  && mkdir -p /app/site/app/access-denied \
+  && cp /tmp/production-fixes/staging-auth-no-loop.ts /app/site/lib/auth.ts \
+  && cp /tmp/production-fixes/staging-access-no-loop.ts /app/site/lib/access.ts \
+  && cp /tmp/production-fixes/staging-access-denied-page.tsx /app/site/app/access-denied/page.tsx \
   && mkdir -p /app/site/app/stock-management \
   && cp /tmp/production-fixes/StockManagement.tsx /app/site/components/operations/StockManagement.tsx \
   && cp /tmp/production-fixes/stock-management-page.tsx /app/site/app/stock-management/page.tsx \
