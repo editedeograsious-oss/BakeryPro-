@@ -17,8 +17,8 @@ export async function POST(request:Request){
   if(!email||!fullName||!ALLOWED_ROLES.includes(role as any)){
     return NextResponse.json({error:"Valid email, name and staff role are required."},{status:400});
   }
-  if(initialPassword.length<10){
-    return NextResponse.json({error:"Initial password must be at least 10 characters."},{status:400});
+  if(initialPassword.length<12){
+    return NextResponse.json({error:"Initial password must be at least 12 characters."},{status:400});
   }
 
   const url=process.env.NEXT_PUBLIC_SUPABASE_URL;
