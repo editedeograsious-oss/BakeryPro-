@@ -9,6 +9,9 @@ WORKDIR /app
 COPY DS-Bakery-Master-v0.37.zip /tmp/ds-bakery.zip
 COPY staging-v038/ /tmp/staging-v038/
 COPY production-fixes/ /tmp/production-fixes/
+COPY production-fixes/ /app/site/production-fixes/
+COPY tests/ /app/site/tests/
+COPY recovery/ /app/site/recovery/
 RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && mv /app/DS-Bakery-Master-v0.37 /app/site \
   && cat /tmp/staging-v038/part-*.b64 | tr -d '\n\r' | base64 -d > /tmp/v038-patch.zip \
@@ -71,6 +74,7 @@ ENV NEXT_PUBLIC_DEMO_MODE=$NEXT_PUBLIC_DEMO_MODE
 
 RUN npm install
 RUN npm audit --audit-level=moderate
+RUN node --test tests/*.test.cjs tests/*.test.mjs
 RUN npm run build
 RUN npm prune --omit=dev
 
