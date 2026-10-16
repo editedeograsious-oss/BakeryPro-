@@ -47,6 +47,7 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
         cache:"no-store",
       });
       const payload=await response.json().catch(()=>({}));
+      if(response.status===404)throw new Error("The staff account creation service has not yet been installed in staging. Contact the bakery administrator.");
       if(!response.ok)throw new Error(payload.error??"Could not create staff account. Check that the staff-account service is configured.");
       setInitialPassword("");setConfirmPassword("");setName("");setEmail("");setRole("cashier");
       setMessage(`Account created for ${staffName}. They can sign in using their email and the initial password you set. Ask them to change it after first login.`);
