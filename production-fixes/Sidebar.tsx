@@ -90,7 +90,7 @@ function MenuLinks({items,onNavigate}:{items:MenuItem[];onNavigate?:()=>void}){
   const pathname=usePathname();
   return <div className="sidebar-link-grid">{items.map(item=>{
     const active=pathname===item.href || (item.href!=="/dashboard" && pathname.startsWith(item.href+"/"));
-    return <Link key={item.href} href={item.href} className={active?"active":""} onClick={onNavigate}>{item.label}</Link>;
+    return <Link key={item.href} prefetch={false} href={item.href} className={active?"active":""} onClick={onNavigate}>{item.label}</Link>;
   })}</div>;
 }
 
