@@ -9,9 +9,8 @@ WORKDIR /app
 COPY DS-Bakery-Master-v0.37.zip /tmp/ds-bakery.zip
 COPY staging-v038/ /tmp/staging-v038/
 COPY production-fixes/ /tmp/production-fixes/
-COPY production-fixes/ /app/site/production-fixes/
-COPY tests/ /app/site/tests/
-COPY recovery/ /app/site/recovery/
+COPY tests/ /tmp/test-suite/tests/
+COPY recovery/ /tmp/test-suite/recovery/
 RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && mv /app/DS-Bakery-Master-v0.37 /app/site \
   && cat /tmp/staging-v038/part-*.b64 | tr -d '\n\r' | base64 -d > /tmp/v038-patch.zip \
@@ -58,7 +57,10 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && mkdir -p /app/site/app/stock-management \
   && cp /tmp/production-fixes/StockManagement.tsx /app/site/components/operations/StockManagement.tsx \
   && cp /tmp/production-fixes/stock-management-page.tsx /app/site/app/stock-management/page.tsx \
-  && rm -rf /tmp/ds-bakery.zip /tmp/v038-patch.zip /tmp/staging-v038 /tmp/production-fixes
+  && cp -R /tmp/test-suite/tests /app/site/tests \
+  && cp -R /tmp/test-suite/recovery /app/site/recovery \
+  && cp -R /tmp/production-fixes /app/site/production-fixes \
+  && rm -rf /tmp/ds-bakery.zip /tmp/v038-patch.zip /tmp/staging-v038 /tmp/production-fixes /tmp/test-suite
 
 WORKDIR /app/site
 
