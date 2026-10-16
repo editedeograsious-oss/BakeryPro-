@@ -12,8 +12,51 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
   const [email,setEmail]=useState("");
   const [name,setName]=useState("");
   const [role,setRole]=useState("cashier");
+  const [initialPassword,setInitialPassword]=useState("");
+  const [confirmPassword,setConfirmPassword]=useState("");
+  const [showPassword,setShowPassword]=useState(false);
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
+
+  async function createStaff(){
+    const staffName=name.trim();
+    const staffEmail=email.trim().toLowerCase();
+    if(!staffName || !staffEmail || !staffEmail.includes("@")){
+      setMessage("Enter the staff member's full name and valid email address."); return;
+    }
+    if(!ROLES.includes(role as any)){
+      setMessage("Choose a permitted staff role."); return;
+    }
+    if(initialPassword.length < 12){
+      setMessage("Set an initial password of at least 12 characters."); return;
+    }
+    if(initialPassword !== confirmPassword){
+      setMessage("The two passwords do not match."); return;
+    }
+    if(!live){setMessage("Demo mode: a real account cannot be created.");return;}
+    if(busy)return;
+    setBusy(true);setMessage("");
+    try{
+      const supabase=createClient();
+      const {data:{session},error:sessionError}=await supabase.auth.getSession();
+      if(sessionError || !session) throw new Error("Sign in as CEO / Owner again to create staff.");
+      const response=await fetch("/api/staff/create",{
+        method:"POST",
+        headers:{"content-type":"application/json","authorization":`Bearer ${session.access_token}`},
+        body:JSON.stringify({email:staffEmail,full_name:staffName,role,initial_password:initialPassword}),
+        cache:"no-store",
+      });
+      const payload=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(payload.error??"Could not create staff account. Check that the staff-account service is configured.");
+      setInitialPassword("");setConfirmPassword("");setName("");setEmail("");setRole("cashier");
+      setMessage(`Account created for ${staffName}. They can sign in using their email and the initial password you set. Ask them to change it after first login.`);
+      router.refresh();
+    }catch(err){
+      setMessage(err instanceof Error?err.message:"Could not create staff account.");
+    }finally{
+      setBusy(false);
+    }
+  }
 
   async function invite(){
     if(!email.trim()||!name.trim()){setMessage("Email and staff name are required.");return;}
@@ -65,7 +108,7 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
 
   return <>
     <div className="pagehead">
-      <div><h1>Staff & Roles</h1><p>CEO / Owner-controlled staff invitations, business roles and account status.</p></div>
+      <div><h1>Staff & Roles</h1><p>CEO / Owner can add staff members individually, set their initial login passwords and manage access.</p></div>
       <span className="badge red">CEO / Owner Only</span>
     </div>
     {message&&<div className="hero" style={{padding:14}}><b>{message}</b></div>}
@@ -78,14 +121,23 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
     </div>
 
     <div className="card" style={{marginTop:16}}>
-      <h3 style={{color:"var(--brown)",marginTop:0}}>Invite Staff Member</h3>
+      <h3 style={{color:"var(--brown)",marginTop:0}}>Add Staff Account — One Person at a Time</h3>
+      <p style={{color:"var(--muted)",marginTop:0}}>CEO / Owner sets the staff member's name, email, job role and first login password. The password is not included in the staff list or activity logs.</p>
       <div className="grid2">
         <div className="field"><label>Full name</label><input value={name} onChange={e=>setName(e.target.value)}/></div>
         <div className="field"><label>Email</label><input type="email" value={email} onChange={e=>setEmail(e.target.value)}/></div>
       </div>
       <div className="field"><label>Role</label><select value={role} onChange={e=>setRole(e.target.value)}>{ROLES.map(r=><option key={r} value={r}>{ROLE_LABELS[r]??r}</option>)}</select></div>
-      <button className="btn primary" disabled={busy} onClick={invite}>{busy?"Working…":"Send Invitation"}</button>
-      <p style={{color:"var(--muted)",fontSize:12}}>Live invitations require the server-only SUPABASE_SERVICE_ROLE_KEY. It is never sent to the browser.</p>
+      <div className="grid2" style={{marginTop:12}}>
+        <div className="field"><label htmlFor="staff-initial-password">Initial password (12+ characters)</label><input id="staff-initial-password" autoComplete="new-password" type={showPassword?"text":"password"} value={initialPassword} onChange={e=>setInitialPassword(e.target.value)} placeholder="Create a unique password" minLength={12}/></div>
+        <div className="field"><label htmlFor="staff-confirm-password">Confirm initial password</label><input id="staff-confirm-password" autoComplete="new-password" type={showPassword?"text":"password"} value={confirmPassword} onChange={e=>setConfirmPassword(e.target.value)} placeholder="Repeat password" minLength={12}/></div>
+      </div>
+      <label style={{display:"flex",gap:8,alignItems:"center",marginBottom:12}}><input type="checkbox" checked={showPassword} onChange={e=>setShowPassword(e.target.checked)}/> Show password while entering</label>
+      <div className="action-row">
+        <button className="btn primary" disabled={busy} onClick={createStaff}>{busy?"Creating…":"Create Staff Account"}</button>
+        <button className="btn secondary" disabled={busy} onClick={invite}>Send Email Invitation Instead</button>
+      </div>
+      <p style={{color:"var(--muted)",fontSize:12}}>Create each administrator separately. Select their role to give only the appropriate permissions. The initial password is sent securely to the staff creation service and never stored in this page's database records. Ask the staff member to set a personal password after signing in.</p>
     </div>
 
     <div className="tablewrap" style={{marginTop:16}}>
