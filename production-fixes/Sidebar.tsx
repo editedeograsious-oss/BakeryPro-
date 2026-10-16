@@ -26,6 +26,7 @@ const sections:MenuSection[]=[
     {href:"/shifts",label:"Cashier Shifts",roles:["owner","manager","cashier"]},
   ]},
   {title:"Products & Stock",items:[
+    {href:"/stock-management",label:"Stock Management",roles:["owner"]},
     {href:"/products",label:"Products & Prices",roles:["owner","manager"]},
     {href:"/inventory",label:"Inventory",roles:["owner","manager","storekeeper","baker"]},
     {href:"/finished-goods",label:"Finished Goods & Batches",roles:["owner","manager","storekeeper","baker"]},
