@@ -73,6 +73,9 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && cp /tmp/production-fixes/BakeryShop.tsx /app/site/components/commerce/BakeryShop.tsx \
   && cp /tmp/production-fixes/OwnerCommerce.tsx /app/site/components/commerce/OwnerCommerce.tsx \
   && cp /tmp/production-fixes/shop-page.tsx /app/site/app/shop/page.tsx \
+  && cp /tmp/production-fixes/seoSite.ts /app/site/lib/seoSite.ts \
+  && cp /tmp/production-fixes/seoRobots.ts /app/site/app/robots.ts \
+  && cp /tmp/production-fixes/seoSitemap.ts /app/site/app/sitemap.ts \
   && cp /tmp/production-fixes/owner-commerce-page.tsx /app/site/app/owner-commerce/page.tsx \
   && mkdir -p /app/site/components/notifications /app/site/app/notifications \
   && cp /tmp/production-fixes/NotificationCenter.tsx /app/site/components/notifications/NotificationCenter.tsx \
