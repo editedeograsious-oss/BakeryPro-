@@ -71,6 +71,9 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && mkdir -p /app/site/components/notifications /app/site/app/notifications \
   && cp /tmp/production-fixes/NotificationCenter.tsx /app/site/components/notifications/NotificationCenter.tsx \
   && cp /tmp/production-fixes/notifications-page.tsx /app/site/app/notifications/page.tsx \
+  && mkdir -p /app/site/app/finished-goods \
+  && cp /tmp/production-fixes/FinishedStockIn.tsx /app/site/components/operations/FinishedStockIn.tsx \
+  && cp /tmp/production-fixes/finished-goods-page.tsx /app/site/app/finished-goods/page.tsx \
   && mkdir -p /app/site/app/stock-management \
   && cp /tmp/production-fixes/StockManagement.tsx /app/site/components/operations/StockManagement.tsx \
   && cp /tmp/production-fixes/stock-management-page.tsx /app/site/app/stock-management/page.tsx \
