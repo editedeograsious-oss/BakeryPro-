@@ -28,7 +28,7 @@ function load(filename, mocks) {
   }).outputText;
   const module = { exports: {} };
   const context = { module, exports: module.exports, console, crypto: globalThis.crypto,
-    require: name => Object.hasOwn(mocks, name) ? mocks[name] : require(name), window: globalThis.window, fetch: globalThis.fetch };
+    require: name => Object.hasOwn(mocks, name) ? mocks[name] : require(name), window: globalThis.window, document: globalThis.document, fetch: globalThis.fetch };
   vm.runInNewContext(code, context, { filename });
   return module.exports.default;
 }
