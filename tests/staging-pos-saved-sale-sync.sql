@@ -39,6 +39,10 @@ DO $verify$ BEGIN
  RAISE EXCEPTION 'POS stock not deducted'; END IF;
  IF (SELECT count(*) FROM public.sale_items WHERE sale_id=current_setting('test.pos.sale')::uuid)<>1 THEN
  RAISE EXCEPTION 'Sale items missing'; END IF;
+ IF (SELECT sales FROM public.owner_dashboard_summary('day'))<>15000 THEN
+ RAISE EXCEPTION 'Owner dashboard failed to show the completed POS sale'; END IF;
+ IF (SELECT transaction_count FROM public.owner_dashboard_summary('day'))<>1 THEN
+ RAISE EXCEPTION 'Owner dashboard daily transaction count is incorrect'; END IF;
 END $verify$;
 DO $replay$ DECLARE second_sale uuid;BEGIN
  SELECT public.complete_sale_v038(
@@ -50,5 +54,5 @@ DO $replay$ DECLARE second_sale uuid;BEGIN
  IF (SELECT quantity_available FROM public.finished_goods_batches WHERE id=current_setting('test.pos.batch')::uuid) <> 2
  THEN RAISE EXCEPTION 'Duplicate stock deduction'; END IF;
 END $replay$;
-SELECT jsonb_build_object('result','PASS','sale_in_db',true,'payment_total',15000,'deducted_units',2,'retry_idempotent',true,'rolled_back',true) result;
+SELECT jsonb_build_object('result','PASS','sale_in_db',true,'payment_total',15000,'deducted_units',2,'retry_idempotent',true,'dashboard_sales',15000,'dashboard_transactions',1,'rolled_back',true) result;
 ROLLBACK;
