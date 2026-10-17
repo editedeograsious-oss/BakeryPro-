@@ -54,6 +54,11 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && cp /tmp/production-fixes/staging-auth-no-loop.ts /app/site/lib/auth.ts \
   && cp /tmp/production-fixes/staging-access-no-loop.ts /app/site/lib/access.ts \
   && cp /tmp/production-fixes/staging-access-denied-page.tsx /app/site/app/access-denied/page.tsx \
+  && mkdir -p /app/site/app/shop /app/site/app/owner-commerce /app/site/components/commerce \
+  && cp /tmp/production-fixes/BakeryShop.tsx /app/site/components/commerce/BakeryShop.tsx \
+  && cp /tmp/production-fixes/OwnerCommerce.tsx /app/site/components/commerce/OwnerCommerce.tsx \
+  && cp /tmp/production-fixes/shop-page.tsx /app/site/app/shop/page.tsx \
+  && cp /tmp/production-fixes/owner-commerce-page.tsx /app/site/app/owner-commerce/page.tsx \
   && mkdir -p /app/site/app/stock-management \
   && cp /tmp/production-fixes/StockManagement.tsx /app/site/components/operations/StockManagement.tsx \
   && cp /tmp/production-fixes/stock-management-page.tsx /app/site/app/stock-management/page.tsx \
