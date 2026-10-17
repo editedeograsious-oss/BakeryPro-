@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { staffHomePath } from "@/lib/staffHome";
 
 function signInError(error: { code?: string; status?: number; name?: string }) {
   if (error.code === "invalid_credentials") {
@@ -67,15 +68,25 @@ export default function Login() {
         setMessage("Sign-in did not create a session. Try again or contact the bakery administrator.");
         return;
       }
+      // Ask the live staging profile for the staff member's active role. The
+      // destination page independently enforces permissions on the server.
+      const {data:staffProfile,error:profileError}=await supabase.from("profiles")
+        .select("role,active,disabled_at").eq("id",data.user.id).maybeSingle();
+      const defaultHome=(!profileError && staffProfile?.active && !staffProfile.disabled_at)
+        ?staffHomePath(staffProfile.role):"/dashboard";
       const requested = params.get("next");
-      let destination = "/dashboard";
+      let destination = defaultHome;
       if (requested?.startsWith("/")) {
         const next = new URL(requested, window.location.origin);
-        if (next.origin === window.location.origin) {
-          destination = `${next.pathname}${next.search}${next.hash}`;
+        if (next.origin === window.location.origin && !["/login","/access-denied"].includes(next.pathname)) {
+          // Never send staff lacking Owner Dashboard access there just
+          // because middleware carried an outdated redirect.
+          destination=next.pathname==="/dashboard" && defaultHome!=="/dashboard"
+            ? defaultHome
+            : `${next.pathname}${next.search}${next.hash}`;
         }
       }
-      // Load the staff page with the newly saved cookies and fresh server data.
+      // Reload with freshly saved auth cookies; never reuse the CEO session.
       window.location.assign(destination);
     } catch {
       setMessage("Could not complete sign-in. Check your connection and try again.");
