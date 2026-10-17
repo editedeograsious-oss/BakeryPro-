@@ -58,7 +58,7 @@ export default function SupplierPaymentCorrections({
       setMessage("Supplier payment corrected.");
       await load();
       router.refresh();
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not correct supplier payment.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not correct supplier payment.");}
     finally{setBusy(false);}
   }
 
@@ -76,7 +76,7 @@ export default function SupplierPaymentCorrections({
       setMessage("Supplier payment voided and purchase balance recalculated.");
       await load();
       router.refresh();
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not void supplier payment.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not void supplier payment.");}
     finally{setBusy(false);}
   }
 
@@ -93,7 +93,7 @@ export default function SupplierPaymentCorrections({
       setMessage("Supplier payment restored.");
       await load();
       router.refresh();
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not restore supplier payment.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not restore supplier payment.");}
     finally{setBusy(false);}
   }
 
