@@ -1,0 +1,18 @@
+const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const path=require("node:path");
+const base=path.resolve(__dirname,"../production-fixes");
+const read=p=>fs.readFileSync(path.join(base,p),"utf8");
+const seo=read("seoSite.ts"),robots=read("seoRobots.ts"),sitemap=read("seoSitemap.ts"),shop=read("shop-page.tsx");
+assert(seo.includes('NEXT_PUBLIC_DEPLOYMENT_ENV !== "production"'),"Stage must never index");
+assert(seo.includes('PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SITE_URL'),"Canonical site must be configured");
+assert(seo.includes('host.endsWith(".railway.app")'),"Railway preview domains excluded");
+assert(seo.includes('host.includes("staging")'),"Staging domains excluded");
+assert(robots.includes('disallow:"/"'),"Staging robots fail closed");
+assert(robots.includes('sitemap: origin + "/sitemap.xml"'),"Only public canonical sitemap");
+assert(robots.includes('"/api/"')&&robots.includes('"/dashboard"')&&robots.includes('"/payroll"'),"Staff routes excluded");
+assert(sitemap.includes('if (!origin) return []'),"Staging must not offer public sitemap listings");
+assert(sitemap.includes('origin + "/shop"'),"Customer shop is the only pre-approved index target");
+assert(shop.includes('generateMetadata():Metadata')&&shop.includes('robots:{index:Boolean(origin),follow:Boolean(origin)}'),"Public site indexing conditional");
+assert(shop.includes('alternates:{canonical:origin+"/shop"}'),"Canonical points to a verified public shop");
+console.log("PASS: DS Bakery SEO keeps staging and staff routes non-indexed until an explicit production HTTPS domain is approved.");
