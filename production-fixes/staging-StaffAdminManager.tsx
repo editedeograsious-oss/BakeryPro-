@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-const ROLES=["manager","cashier","baker","storekeeper"] as const;
-const ROLE_LABELS:Record<string,string>={owner:"CEO / Owner",manager:"General Manager",baker:"Head Baker",storekeeper:"Stock Manager",cashier:"Sales Team"};
+const ROLES=["manager","cashier","baker","storekeeper","viewer"] as const;
+const ROLE_LABELS:Record<string,string>={owner:"CEO / Owner",manager:"General Manager",baker:"Head Baker",storekeeper:"Stock Manager",cashier:"Sales Team",viewer:"View-Only Staff"};
 
 export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean}){
   const router=useRouter();
@@ -59,7 +59,7 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
         throw new Error("Login creation was submitted, but the staff profile could not be verified. Do not create a duplicate; refresh Staff & Roles and contact the administrator.");
       }
       setInitialPassword("");setConfirmPassword("");setName("");setEmail("");setRole("cashier");
-      setMessage(`STAGING staff account verified for ${staffName}. They can now sign in at this Staging website using their email and initial password. Ask them to change their password after first login.`);
+      setMessage(`STAGING staff account verified for ${staffName}. They can now sign in at this Staging website using their email and initial password. They must replace their temporary password on first login.`);
       router.refresh();
     }catch(err){
       setMessage(err instanceof Error?err.message:"Could not create staff account.");
@@ -126,7 +126,7 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
     <div className="grid4">
       <div className="card stat"><div className="label">Active Staff</div><div className="value">{staff.filter(s=>s.active).length}</div></div>
       <div className="card stat"><div className="label">Disabled</div><div className="value">{staff.filter(s=>!s.active).length}</div></div>
-      <div className="card stat"><div className="label">Roles</div><div className="value">5</div></div>
+      <div className="card stat"><div className="label">Roles</div><div className="value">6</div></div>
       <div className="card stat"><div className="label">CEO / Owner Accounts</div><div className="value">{staff.filter(s=>s.role==="owner").length}</div></div>
     </div>
 
@@ -147,7 +147,7 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
         <button className="btn primary" disabled={busy} onClick={createStaff}>{busy?"Creating…":"Create Staff Account"}</button>
         <button className="btn secondary" disabled={busy} onClick={invite}>Send Email Invitation Instead</button>
       </div>
-      <p style={{color:"var(--muted)",fontSize:12}}>Create each administrator separately. Select their role to give only the appropriate permissions. The initial password is sent securely to the staff creation service and never stored in this page's database records. Ask the staff member to set a personal password after signing in.</p>
+      <p style={{color:"var(--muted)",fontSize:12}}>Create each administrator separately. Select their role to give only the appropriate permissions. The initial password is sent securely to the staff creation service and never stored in this page's database records. The staff member must choose a new password at first sign-in before accessing any business records.</p>
     </div>
 
     <div className="tablewrap" style={{marginTop:16}}>

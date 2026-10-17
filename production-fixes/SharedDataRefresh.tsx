@@ -3,11 +3,12 @@ import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-type StaffRole = "owner" | "manager" | "cashier" | "baker" | "storekeeper";
+type StaffRole = "owner" | "manager" | "cashier" | "baker" | "storekeeper" | "viewer";
 
 // Realtime carries only safe module+revision metadata. Actual data is always
 // re-read via its existing authenticated / RLS-protected server-side queries.
 const routeModules: Record<string, readonly string[]> = {
+  "/view-only": ["catalog", "inventory"],
   "/dashboard": ["sales", "orders", "inventory", "purchases", "production", "finance", "catalog", "staff"],
   "/reports": ["sales", "orders", "inventory", "purchases", "production", "finance"],
   "/pos": ["sales", "inventory", "catalog", "orders"],

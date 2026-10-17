@@ -22,9 +22,10 @@ export async function getCurrentStaff() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   const { data: profile, error } = await supabase.from("profiles")
-    .select("id,full_name,role,active,session_version,disabled_at")
+    .select("id,full_name,role,active,session_version,disabled_at,require_password_reset")
     .eq("id", user.id).single();
   if (error || !profile || !profile.active || profile.disabled_at) return null;
+  if (profile.require_password_reset && profile.role !== "owner") redirect("/first-login");
   return { demo: false, user, profile };
 }
 

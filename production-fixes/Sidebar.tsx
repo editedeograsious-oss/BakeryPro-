@@ -8,17 +8,19 @@ import type { StaffRole } from "@/lib/permissions";
 import NotificationCenter from "@/components/notifications/NotificationCenter";
 import SharedDataRefresh from "@/components/sync/SharedDataRefresh";
 
-type MenuItem={href:string;label:string;roles:StaffRole[]};
+type VisibleRole=StaffRole|"viewer";
+type MenuItem={href:string;label:string;roles:VisibleRole[]};
 type MenuSection={title:string;items:MenuItem[]};
 
-const all:StaffRole[]=["owner","manager","cashier","baker","storekeeper"];
-const ownerManager:StaffRole[]=["owner","manager"];
-const roleLabels:Record<StaffRole,string>={
+const all:VisibleRole[]=["owner","manager","cashier","baker","storekeeper"];
+const ownerManager:VisibleRole[]=["owner","manager"];
+const roleLabels:Record<VisibleRole,string>={
   owner:"CEO / Owner", manager:"General Manager", baker:"Head Baker",
-  storekeeper:"Stock Manager", cashier:"Sales Team",
+  storekeeper:"Stock Manager", cashier:"Sales Team",viewer:"View-Only Staff",
 };
 
 const sections:MenuSection[]=[
+  {title:"View-Only Workspace",items:[{href:"/view-only",label:"View Products & Stock",roles:["viewer"]}]},
   {title:"Daily Operations",items:[
     {href:"/dashboard",label:"Dashboard",roles:ownerManager},
     {href:"/pos",label:"Sales / POS",roles:["owner","manager","cashier"]},
@@ -105,7 +107,7 @@ function MenuLinks({items,onNavigate}:{items:MenuItem[];onNavigate?:()=>void}){
 
 export default function Sidebar(){
   const router=useRouter();
-  const [role,setRole]=useState<StaffRole|null>(null);
+  const [role,setRole]=useState<VisibleRole|null>(null);
   const [name,setName]=useState("DS Bakery Staff");
   const [loaded,setLoaded]=useState(false);
   const [mobileOpen,setMobileOpen]=useState(false);
@@ -126,7 +128,7 @@ export default function Sidebar(){
         const {data}=await supabase.from("profiles").select("full_name,role,active,disabled_at").eq("id",user.id).single();
         if(!active)return;
         if(data?.active && !data?.disabled_at){
-          setRole(data.role as StaffRole);
+          setRole(data.role as VisibleRole);
           setName(data.full_name || "DS Bakery Staff");
         }
       } finally {
@@ -161,7 +163,7 @@ export default function Sidebar(){
       <div className="sidebar-profile-card">
         <div className="sidebar-profile-name">{name}</div>
         <div className="sidebar-profile-role">{role?roleLabels[role]:(loaded?"No active staff session":"Loading menu…")}</div>
-        {role&&<NotificationCenter view="bell"/>}
+        {role&&role!=="viewer"&&<NotificationCenter view="bell"/>}
         {role&&<SharedDataRefresh role={role}/>}
         <div style={{marginTop:8}}>
           {operationsOpen===null?<span className="badge gold">Checking live status…</span>:operationsOpen?<span className="badge green">Live Operations Enabled</span>:<span className="badge red">Live Operations Locked</span>}

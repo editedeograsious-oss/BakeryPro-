@@ -11,6 +11,8 @@ export function staffHomePath(role: string | null | undefined): string {
       return "/production";
     case "storekeeper":
       return "/inventory";
+    case "viewer":
+      return "/view-only";
     default:
       return "/access-denied?reason=role";
   }

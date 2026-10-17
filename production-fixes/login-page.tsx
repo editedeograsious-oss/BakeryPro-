@@ -71,12 +71,12 @@ export default function Login() {
       // Ask the live staging profile for the staff member's active role. The
       // destination page independently enforces permissions on the server.
       const {data:staffProfile,error:profileError}=await supabase.from("profiles")
-        .select("role,active,disabled_at").eq("id",data.user.id).maybeSingle();
+        .select("role,active,disabled_at,require_password_reset").eq("id",data.user.id).maybeSingle();
       const defaultHome=(!profileError && staffProfile?.active && !staffProfile.disabled_at)
-        ?staffHomePath(staffProfile.role):"/dashboard";
+        ?(staffProfile.require_password_reset?"/first-login":staffHomePath(staffProfile.role)):"/dashboard";
       const requested = params.get("next");
       let destination = defaultHome;
-      if (requested?.startsWith("/")) {
+      if (defaultHome!=="/first-login" && requested?.startsWith("/")) {
         const next = new URL(requested, window.location.origin);
         if (next.origin === window.location.origin && !["/login","/access-denied"].includes(next.pathname)) {
           // Never send staff lacking Owner Dashboard access there just
