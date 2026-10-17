@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { StaffRole } from "@/lib/permissions";
 import NotificationCenter from "@/components/notifications/NotificationCenter";
+import SharedDataRefresh from "@/components/sync/SharedDataRefresh";
 
 type MenuItem={href:string;label:string;roles:StaffRole[]};
 type MenuSection={title:string;items:MenuItem[]};
@@ -161,6 +162,7 @@ export default function Sidebar(){
         <div className="sidebar-profile-name">{name}</div>
         <div className="sidebar-profile-role">{role?roleLabels[role]:(loaded?"No active staff session":"Loading menu…")}</div>
         {role&&<NotificationCenter view="bell"/>}
+        {role&&<SharedDataRefresh role={role}/>}
         <div style={{marginTop:8}}>
           {operationsOpen===null?<span className="badge gold">Checking live status…</span>:operationsOpen?<span className="badge green">Live Operations Enabled</span>:<span className="badge red">Live Operations Locked</span>}
         </div>
