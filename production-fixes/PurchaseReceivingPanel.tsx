@@ -83,7 +83,7 @@ export default function PurchaseReceivingPanel({lines,history=[],live,operations
           <td>{Number(l.received_qty_base).toLocaleString()} {l.base_unit}</td>
           <td><b>{Number(l.remaining_qty_base).toLocaleString()} {l.base_unit}</b></td>
           <td>{ugx(Number(l.unit_cost_base))}/{l.base_unit}</td>
-          <td><div style={{display:"flex",gap:6,minWidth:190}}><input type="number" min="0.000001" max={Number(l.remaining_qty_base)} step="any" aria-label={`Receive quantity for ${l.material_name} on ${l.purchase_no}`} disabled={busy||!operationsAllowed} style={{maxWidth:105}} value={quantities[l.id]??0} onChange={e=>setQuantities(prev=>({...prev,[l.id]:Number(e.target.value)}))}/><button className="btn primary" disabled={busy||!operationsAllowed} onClick={()=>receive(l)}>Receive</button></div></td>
+          <td><div style={{display:"flex",gap:6,minWidth:190}}><input type="number" min="0.000001" max={Number(l.remaining_qty_base)} step="any" aria-label={`Receive quantity for ${l.material_name} on ${l.purchase_no}`} disabled={busy||!operationsAllowed} style={{maxWidth:105}} value={quantities[l.id]===0?"":quantities[l.id]??""} onChange={e=>setQuantities(prev=>({...prev,[l.id]:Number(e.target.value)}))}/><button className="btn primary" disabled={busy||!operationsAllowed} onClick={()=>receive(l)}>Receive</button></div></td>
         </tr>)}</tbody>
       </table></div>
     </div>
