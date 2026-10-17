@@ -21,7 +21,24 @@ DO $check$ BEGIN
  IF NOT EXISTS(SELECT 1 FROM public.public_product_catalog() WHERE id=current_setting('test.flow.product')::uuid) THEN
  RAISE EXCEPTION 'Guest catalogue missing published product'; END IF;
 END $check$;
-SELECT set_config('test.flow.order',public.submit_public_order('ROLLBACK E2E CUSTOMER','0711-STAGING-TEST',null,'pickup',now()+interval '2 days',null,'Automated integration fixture',jsonb_build_array(jsonb_build_object('product_id',current_setting('test.flow.product'),'quantity',2)),gen_random_uuid())::text,true);
+DO $must_sign_in$ DECLARE blocked boolean:=false; BEGIN
+  BEGIN
+    PERFORM public.submit_public_order('ROLLBACK E2E CUSTOMER','0711-STAGING-TEST',null,'pickup',
+    now()+interval '2 days',null,'Automated integration fixture',
+    jsonb_build_array(jsonb_build_object('product_id',current_setting('test.flow.product'),'quantity',2)),gen_random_uuid());
+  EXCEPTION WHEN insufficient_privilege OR raise_exception THEN blocked:=true; END;
+  IF NOT blocked THEN RAISE EXCEPTION 'Guest customer order bypassed verified-login requirement'; END IF;
+END $must_sign_in$;
+RESET ROLE;
+SELECT set_config('test.flow.phone','07'||substr(md5(gen_random_uuid()::text),1,12),true);
+SELECT set_config('request.jwt.claim.sub',current_setting('test.flow.owner'),true);
+SET LOCAL ROLE authenticated;
+SELECT set_config('test.flow.order',public.submit_public_order(
+  'ROLLBACK E2E CUSTOMER',current_setting('test.flow.phone'),
+  (SELECT email FROM auth.users WHERE id=current_setting('test.flow.owner')::uuid),
+  'pickup',now()+interval '2 days',null,'Automated integration fixture',
+  jsonb_build_array(jsonb_build_object('product_id',current_setting('test.flow.product'),'quantity',2)),gen_random_uuid()
+)::text,true);
 RESET ROLE;
 SELECT set_config('request.jwt.claim.sub',current_setting('test.flow.owner'),true);
 SET LOCAL ROLE authenticated;
@@ -66,7 +83,7 @@ RESET ROLE;
 SELECT set_config('request.jwt.claim.sub','',true);
 SET LOCAL ROLE anon;
 SELECT set_config('test.flow.review',public.submit_verified_product_review(
-current_setting('test.flow.order')::jsonb->>'order_no','0711-STAGING-TEST',current_setting('test.flow.product')::uuid,
+current_setting('test.flow.order')::jsonb->>'order_no',current_setting('test.flow.phone'),current_setting('test.flow.product')::uuid,
 5,'Staging Customer','Test item was fresh and carefully packed.')::text,true);
 DO $check$ BEGIN
  IF EXISTS(SELECT 1 FROM public.approved_product_reviews(current_setting('test.flow.product')::uuid)) THEN RAISE EXCEPTION 'Unapproved review was exposed publicly'; END IF;
@@ -81,5 +98,5 @@ SET LOCAL ROLE anon;
 DO $check$ BEGIN
  IF (SELECT count(*) FROM public.approved_product_reviews(current_setting('test.flow.product')::uuid))<>1 THEN RAISE EXCEPTION 'Approved customer review missing'; END IF;
 END $check$;
-SELECT jsonb_build_object('result','PASS','staging_only',true,'catalogue_published',true,'checkout_total_ugx',15000,'empty_stock_completion_blocked',true,'quantity_deducted',2,'review_verified',true,'moderated_and_visible',true,'changes_rolled_back',true) AS commerce_e2e;
+SELECT jsonb_build_object('result','PASS','staging_only',true,'catalogue_published',true,'checkout_total_ugx',15000,'empty_stock_completion_blocked',true,'quantity_deducted',2,'review_verified',true,'moderated_and_visible',true,'guest_checkout_blocked',true,'verified_login_required',true,'changes_rolled_back',true) AS commerce_e2e;
 ROLLBACK;
