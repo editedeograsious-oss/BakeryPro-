@@ -8,7 +8,7 @@ async function main(){
     posts.push({path,body:JSON.parse(init.body),headers:init.headers});
     return respond(path,init);
   };
-  const client={auth:{getSession:async()=>({data:{session:{access_token:"test-bearer"}},error:null})},from:(table)=>{assert.equal(table,"profiles");return {select:()=>({eq:()=>({maybeSingle:async()=>({data:{id:"test-staff",role:"cashier",active:true},error:null})})})};}};
+  const client={auth:{getSession:async()=>({data:{session:{access_token:"test-bearer"}},error:null})},from:(table)=>{assert.equal(table,"profiles");return {select:()=>({eq:()=>({maybeSingle:async()=>({data:{id:"test-staff",role:"cashier",active:true,require_password_reset:true},error:null})})})};}};
   const ui=harness("staging-StaffAdminManager.tsx",{staff:[],live:true},client);
   function inputs(){return find(ui.render(),n=>n.type==="input");}
   function enter(fields){

@@ -53,8 +53,8 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
       // A success response is not enough. Verify the authenticated CEO can see
       // the staff profile in the same STAGING database as the login form.
       const {data:profile,error:verifyError}=await supabase.from("profiles")
-        .select("id,role,active").eq("id",payload.user_id).maybeSingle();
-      if(verifyError || !profile || profile.role!==role || !profile.active){
+        .select("id,role,active,require_password_reset").eq("id",payload.user_id).maybeSingle();
+      if(verifyError || !profile || profile.role!==role || !profile.active || profile.require_password_reset!==true){
         setInitialPassword("");setConfirmPassword("");
         throw new Error("Login creation was submitted, but the staff profile could not be verified. Do not create a duplicate; refresh Staff & Roles and contact the administrator.");
       }
