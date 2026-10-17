@@ -48,7 +48,7 @@ export default function SharedDataRefresh({ role }: { role: StaffRole }) {
     const wanted = routeModules[pathname];
     let active = true;
     let dirty = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timer = 0;
 
     function flush() {
       if (!active || !dirty) return;
@@ -66,7 +66,7 @@ export default function SharedDataRefresh({ role }: { role: StaffRole }) {
     }
     function schedule(delay = 800) {
       dirty = true;
-      if (timer !== undefined) window.clearTimeout(timer);
+      if (timer !== 0) window.clearTimeout(timer);
       timer = window.setTimeout(flush, delay);
     }
     function wake() {
@@ -98,7 +98,7 @@ export default function SharedDataRefresh({ role }: { role: StaffRole }) {
     window.addEventListener("online", wake);
     return () => {
       active = false;
-      if (timer !== undefined) window.clearTimeout(timer);
+      if (timer !== 0) window.clearTimeout(timer);
       window.clearInterval(periodic);
       document.removeEventListener("visibilitychange", wake);
       document.removeEventListener("focusout", regainFocus);
