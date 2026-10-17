@@ -33,6 +33,7 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && cp /tmp/production-fixes/expenses-page.tsx /app/site/app/expenses/page.tsx \
   && cp /tmp/production-fixes/RuntimeBanner.tsx /app/site/components/RuntimeBanner.tsx \
   && cp /tmp/production-fixes/login-page.tsx /app/site/app/login/page.tsx \
+  && cp /tmp/production-fixes/staffHome.ts /app/site/lib/staffHome.ts \
   && cp /tmp/production-fixes/GoLiveSetupManager.tsx /app/site/components/validation/GoLiveSetupManager.tsx \
   && cp /tmp/production-fixes/validate_project.mjs /app/site/scripts/validate_project.mjs \
   && mkdir -p /app/site/app/api/staff/create /app/site/app/api/staff/invite \
