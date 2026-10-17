@@ -49,8 +49,17 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
       const payload=await response.json().catch(()=>({}));
       if(response.status===404)throw new Error("The staff account creation service has not yet been installed in staging. Contact the bakery administrator.");
       if(!response.ok)throw new Error(payload.error??"Could not create staff account. Check that the staff-account service is configured.");
+      if(payload.ok!==true || typeof payload.user_id!=="string")throw new Error("Account service did not confirm a new staff login.");
+      // A success response is not enough. Verify the authenticated CEO can see
+      // the staff profile in the same STAGING database as the login form.
+      const {data:profile,error:verifyError}=await supabase.from("profiles")
+        .select("id,role,active").eq("id",payload.user_id).maybeSingle();
+      if(verifyError || !profile || profile.role!==role || !profile.active){
+        setInitialPassword("");setConfirmPassword("");
+        throw new Error("Login creation was submitted, but the staff profile could not be verified. Do not create a duplicate; refresh Staff & Roles and contact the administrator.");
+      }
       setInitialPassword("");setConfirmPassword("");setName("");setEmail("");setRole("cashier");
-      setMessage(`Account created for ${staffName}. They can sign in using their email and the initial password you set. Ask them to change it after first login.`);
+      setMessage(`STAGING staff account verified for ${staffName}. They can now sign in at this Staging website using their email and initial password. Ask them to change their password after first login.`);
       router.refresh();
     }catch(err){
       setMessage(err instanceof Error?err.message:"Could not create staff account.");
@@ -109,7 +118,7 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
 
   return <>
     <div className="pagehead">
-      <div><h1>Staff & Roles</h1><p>CEO / Owner can add staff members individually, set their initial login passwords and manage access.</p></div>
+      <div><h1>Staff & Roles</h1><p>CEO / Owner can add staff members individually, set their initial login passwords and manage access. <strong>Accounts created here belong to this STAGING environment only.</strong></p></div>
       <span className="badge red">CEO / Owner Only</span>
     </div>
     {message&&<div className="hero" style={{padding:14}}><b>{message}</b></div>}
