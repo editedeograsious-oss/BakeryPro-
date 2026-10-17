@@ -78,7 +78,7 @@ export default function PurchaseOrderManager({
       requestId.current=crypto.randomUUID();
       setInvoiceNo("");setInvoiceDate("");setDiscount(0);setNotes("");
       router.refresh();
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not create purchase order.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not create purchase order.");}
     finally{setBusy(false);}
   }
 
@@ -92,7 +92,7 @@ export default function PurchaseOrderManager({
       if(error)throw error;
       setMessage(`Purchase order ${decision}d.`);
       router.refresh();
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not decide purchase order.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not decide purchase order.");}
     finally{setBusy(false);}
   }
 
@@ -135,7 +135,7 @@ export default function PurchaseOrderManager({
       })));
       setEditReason("");
       window.scrollTo({top:0,behavior:"smooth"});
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not load purchase for editing.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not load purchase for editing.");}
     finally{setBusy(false);}
   }
 
@@ -165,7 +165,7 @@ export default function PurchaseOrderManager({
       setEditLines([]);
       setEditReason("");
       router.refresh();
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not edit purchase order.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not edit purchase order.");}
     finally{setBusy(false);}
   }
 
