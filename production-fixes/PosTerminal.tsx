@@ -1,0 +1,136 @@
+"use client";
+import {useEffect,useMemo,useRef,useState} from "react";
+import {useRouter} from "next/navigation";
+import Sidebar from "@/components/Sidebar";
+import {createClient} from "@/lib/supabase/client";
+import {subtotal,discountAmount,grandTotal,changeDue,type CartLine} from "@/lib/pos";
+import {ugx} from "@/lib/costing";
+
+type PaymentMethod="cash"|"mtn_momo"|"airtel_money"|"customer_credit";
+type Sale={id:string;sale_no:string|null;total:number|string;created_at:string;status:string;held:boolean;cashier_id:string|null};
+function sanitizeAmount(raw:string){let value=raw.replace(/[^0-9.]/g,"");let [whole,...frac]=value.split(".");whole=whole.replace(/^0+(?=\d)/,"");if(value.startsWith("."))whole="0";return frac.length?whole+"."+frac.join("").slice(0,2):whole;}
+function amount(raw:string){const n=Number(raw);return Number.isFinite(n)&&n>=0?n:0;}
+function MoneyInput({value,onChange,label,kind="money"}:{value:string;onChange:(value:string)=>void;label:string;kind?:"money"|"percent"}){
+  return <div className="field"><label>{label}</label><input type="text" inputMode="decimal" autoComplete="off"
+    aria-label={label} placeholder={kind==="money"?"Enter amount in UGX":"Enter percentage"}
+    value={value} onChange={e=>onChange(sanitizeAmount(e.target.value))}
+    onFocus={e=>e.currentTarget.select()} /></div>;
+}
+export default function PosTerminal({products,openShift,customers,live}:{products:any[];openShift:any|null;customers:any[];live:boolean}){
+  const router=useRouter();
+  const [cart,setCart]=useState<CartLine[]>([]);
+  const [discountType,setDiscountType]=useState<"amount"|"percent">("amount");
+  const [discountText,setDiscountText]=useState("");
+  const [paymentMethod,setPaymentMethod]=useState<PaymentMethod>("cash");
+  const [receivedText,setReceivedText]=useState("");
+  const [reference,setReference]=useState("");
+  const [customerId,setCustomerId]=useState("");
+  const [message,setMessage]=useState("");
+  const [busy,setBusy]=useState(false);
+  const [sales,setSales]=useState<Sale[]>([]);
+  const [historyStatus,setHistoryStatus]=useState("");
+  const [syncAt,setSyncAt]=useState("");
+  const requestId=useRef(crypto.randomUUID());
+  const sub=useMemo(()=>subtotal(cart),[cart]);
+  const disc=useMemo(()=>discountAmount(sub,discountType,amount(discountText)),[sub,discountType,discountText]);
+  const total=useMemo(()=>grandTotal(sub,disc),[sub,disc]);
+  const received=amount(receivedText);
+  const change=paymentMethod==="cash"?changeDue(received,total):0;
+  const selectedCustomer=customers.find((c:any)=>(c.id??c.customer_id)===customerId);
+  function addProduct(p:any){setCart(prev=>{const current=prev.find(x=>x.productId===p.id);return current?prev.map(x=>x.productId===p.id?{...x,quantity:x.quantity+1}:x):[...prev,{productId:p.id,name:p.name,unitPrice:Number(p.selling_price),quantity:1}];});}
+  function updateQty(id:string,delta:number){setCart(prev=>prev.map(x=>x.productId===id?{...x,quantity:Math.max(0,x.quantity+delta)}:x).filter(x=>x.quantity>0));}
+
+  async function refreshSales(){
+    if(!live)return;
+    const sb=createClient();
+    const {data,error}=await sb.from("sales")
+      .select("id,sale_no,total,created_at,status,held,cashier_id")
+      .order("created_at",{ascending:false}).limit(25);
+    if(error){setHistoryStatus("Could not sync sales: "+error.message);return;}
+    setSales(data??[]);
+    setSyncAt(new Date().toLocaleTimeString());
+    setHistoryStatus("");
+  }
+  useEffect(()=>{
+    if(!live)return;
+    const supabase=createClient();
+    let active=true;
+    void refreshSales();
+    const handler=()=>{if(active&&document.visibilityState==="visible")void refreshSales();};
+    const interval=window.setInterval(handler,15000);
+    document.addEventListener("visibilitychange",handler);
+    const channel=supabase.channel("bakery-pos-sales")
+      .on("postgres_changes",{event:"*",schema:"public",table:"sales"},()=>{if(active)void refreshSales();})
+      .subscribe();
+    return()=>{active=false;window.clearInterval(interval);document.removeEventListener("visibilitychange",handler);void supabase.removeChannel(channel);};
+  },[live]);
+
+  async function submit(hold:boolean){
+    if(busy)return;
+    if(!cart.length){setMessage("Add at least one product.");return;}
+    if(!openShift){setMessage("Open your cashier shift before posting sales.");return;}
+    if(!hold && paymentMethod==="cash"&&received<total){setMessage("Cash received is less than the total.");return;}
+    if(!hold && ["mtn_momo","airtel_money"].includes(paymentMethod)&&!reference.trim()){setMessage("Enter the Mobile Money transaction reference.");return;}
+    if(!hold&&paymentMethod==="customer_credit"&&!customerId){setMessage("Select a customer for a credit sale.");return;}
+    if(!hold&&paymentMethod==="customer_credit"&&!selectedCustomer?.credit_enabled){setMessage("Customer credit is not enabled.");return;}
+    if(!hold&&paymentMethod==="customer_credit"&&Number(selectedCustomer?.available_credit??0)<total){setMessage("Not enough available customer credit.");return;}
+    if(!live){setMessage("Demo mode: NO SALE SAVED to shared cloud records.");return;}
+    setBusy(true);setMessage("Saving the sale to shared records…");
+    try{
+      const sb=createClient();
+      const argumentsBase={p_items:cart.map(x=>({product_id:x.productId,quantity:x.quantity})),p_discount:disc,p_notes:null,p_client_request_id:requestId.current};
+      const {data,error}=(!hold&&paymentMethod==="customer_credit")
+        ?await sb.rpc("complete_credit_sale",{...argumentsBase,p_customer_id:customerId})
+        :await sb.rpc("complete_sale_with_customer",{
+            ...argumentsBase,p_payments:hold?[]:[{method:paymentMethod,amount:total,reference:paymentMethod==="cash"?null:reference.trim()}],
+            p_hold:hold,p_customer_id:customerId||null
+          });
+      if(error)throw error;
+      const receipt=typeof data==="string"?data:typeof data==="object"?data?.sale_no??data?.sale_id??JSON.stringify(data):String(data);
+      setMessage((hold?"Sale held":"Sale completed")+" and SAVED to staging cloud records. Receipt: "+receipt);
+      requestId.current=crypto.randomUUID();
+      if(!hold){setCart([]);setDiscountText("");setReceivedText("");setReference("");setCustomerId("");}
+      await refreshSales();router.refresh();
+    }catch(error){
+      setMessage("SALE NOT SAVED: "+(error instanceof Error?error.message:"Check the connection, business lock, stock, permissions and cashier shift."));
+    }finally{setBusy(false);}
+  }
+
+  return <div className="shell"><Sidebar/><main className="main">
+    <div className="pagehead"><div><h1>Cashier POS</h1><p>Shared cloud sales with clear save confirmation and automatically refreshed records.</p></div>
+      <div className="action-row"><span className={openShift?"badge green":"badge red"}>{openShift?"Shift Open":"No Open Shift"}</span>
+      <button className="btn secondary" disabled={busy} onClick={()=>submit(true)}>Hold Sale</button>
+      <button className="btn secondary" disabled={busy} onClick={()=>setCart([])}>Clear Cart</button></div></div>
+    {!live&&<div className="hero"><strong>Demo mode:</strong> this screen cannot save actual shared sales.</div>}
+    {message&&<div className="hero" role="status" style={{padding:14,marginBottom:14}}><b>{message}</b></div>}
+    {!openShift&&<div className="hero"><strong>Cashier shift required.</strong> <a href="/shifts">Open your shift before selling</a>.</div>}
+    <div className="grid2">
+      <section className="card"><h3>Products</h3><div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+        {products.map(p=><button type="button" key={p.id} className="btn secondary" onClick={()=>addProduct(p)} style={{minHeight:83,textAlign:"left"}}>
+          <strong>{p.name}</strong><div>{p.category_name}</div><small>{ugx(Number(p.selling_price))}</small></button>)}
+      </div></section>
+      <section className="card"><h3>Current Sale</h3>
+      {cart.length===0?<p>Tap a product to begin.</p>:<div className="tablewrap"><table><thead><tr><th>Product</th><th>Qty</th><th>Total</th></tr></thead>
+      <tbody>{cart.map(line=><tr key={line.productId}><td>{line.name}<small style={{display:"block"}}>{ugx(line.unitPrice)} each</small></td>
+        <td><div className="action-row"><button className="btn secondary" onClick={()=>updateQty(line.productId,-1)}>−</button><strong>{line.quantity}</strong><button className="btn secondary" onClick={()=>updateQty(line.productId,1)}>+</button></div></td>
+        <td>{ugx(line.unitPrice*line.quantity)}</td></tr>)}</tbody></table></div>}
+      <div className="grid2"><div className="field"><label>Discount type</label><select value={discountType} onChange={e=>{setDiscountType(e.target.value as "amount"|"percent");setDiscountText("");}}><option value="amount">Amount (UGX)</option><option value="percent">Percent (%)</option></select></div>
+        <MoneyInput label="Discount value" value={discountText} onChange={setDiscountText} kind={discountType==="percent"?"percent":"money"}/></div>
+      <p>Subtotal: <b>{ugx(sub)}</b></p><p>Discount: <b>{ugx(disc)}</b></p><h3>Total: {ugx(total)}</h3>
+      <div className="field"><label>Customer (optional)</label><select value={customerId} onChange={e=>setCustomerId(e.target.value)}><option value="">Walk-in customer</option>{customers.map(c=><option key={c.id??c.customer_id} value={c.id??c.customer_id}>{c.full_name}</option>)}</select></div>
+      <div className="field"><label>Payment method</label><select value={paymentMethod} onChange={e=>setPaymentMethod(e.target.value as PaymentMethod)}><option value="cash">Cash</option><option value="mtn_momo">MTN MoMo</option><option value="airtel_money">Airtel Money</option><option value="customer_credit">Customer Credit</option></select></div>
+      {paymentMethod==="cash"?<><MoneyInput label="Cash received" value={receivedText} onChange={setReceivedText}/><p>Change: <strong>{ugx(change)}</strong></p></>:
+      paymentMethod==="customer_credit"?<p>Available credit: {ugx(Number(selectedCustomer?.available_credit??0))}</p>:
+      <div className="field"><label>Transaction reference</label><input value={reference} onChange={e=>setReference(e.target.value)} /></div>}
+      <button className="btn primary" disabled={busy||!openShift||!cart.length||(!live)} onClick={()=>submit(false)} style={{width:"100%",marginTop:9}}>{busy?"Saving…":"Complete and Save Sale"}</button>
+      </section>
+    </div>
+    <section className="card" style={{marginTop:16}}><div className="pagehead"><div><h2>Shared POS Sales History</h2><p>Saved cloud transactions visible to authorized staff. Customer web orders remain separate until processed.</p></div>
+      <button className="btn secondary" type="button" onClick={()=>void refreshSales()}>Refresh Sales</button></div>
+      {historyStatus&&<p role="alert">{historyStatus}</p>}<p style={{fontSize:12}}>Last synced: {syncAt||"Awaiting connection"}. Updates automatically approximately every 15 seconds while open.</p>
+      {sales.length===0?<p>No saved sales found in this environment.</p>:<div className="tablewrap"><table><thead><tr><th>Sale</th><th>Recorded</th><th>Status</th><th>Amount</th></tr></thead>
+      <tbody>{sales.map(s=><tr key={s.id}><td>{s.sale_no||s.id.slice(0,8)}</td><td>{new Date(s.created_at).toLocaleString()}</td>
+      <td>{s.held?"Held":s.status}</td><td>{ugx(Number(s.total))}</td></tr>)}</tbody></table></div>}
+    </section>
+  </main></div>;
+}
