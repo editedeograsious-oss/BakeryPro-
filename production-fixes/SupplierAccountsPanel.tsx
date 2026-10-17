@@ -66,7 +66,7 @@ export default function SupplierAccountsPanel({
       requestId.current=crypto.randomUUID();
       setAmount(0);setReference("");
       router.refresh();
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not record supplier payment.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not record supplier payment.");}
     finally{setBusy(false);}
   }
 
