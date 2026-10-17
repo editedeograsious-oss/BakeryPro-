@@ -38,7 +38,7 @@ export default function InventoryManager({materials,suppliers,live,canAdjust,can
       const {error}=await supabase.rpc("save_raw_material",{p_raw_material_id:editing?.id??null,p_supplier_id:supplierId||null,p_name:matName.trim(),p_sku:sku.trim()||null,p_base_unit:baseUnit.trim(),p_purchase_pack_label:packLabel.trim()||null,p_purchase_pack_base_qty:packQty,p_low_stock_threshold:lowThreshold});
       if(error)throw error;
       setMessage(editing?"Raw material updated.":"Raw material added.");clearMaterial();router.refresh();
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not save raw material.");}finally{setBusy(false);}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not save raw material.");}finally{setBusy(false);}
   }
 
   async function saveCount(){
@@ -47,7 +47,7 @@ export default function InventoryManager({materials,suppliers,live,canAdjust,can
     if(!live){setMessage("Demo mode: stock count simulated.");return;}
     setBusy(true);setMessage("");
     try{const supabase=createClient();const {error}=await supabase.rpc("record_stock_count",{p_raw_material_id:selected,p_counted_qty:counted,p_reason:reason.trim(),p_client_request_id:requestId.current});if(error)throw error;setMessage("Stock count posted to the movement ledger.");requestId.current=crypto.randomUUID();router.refresh();}
-    catch(e){setMessage(e instanceof Error?e.message:"Could not save stock count.");}finally{setBusy(false);}
+    catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not save stock count.");}finally{setBusy(false);}
   }
 
   return <>
