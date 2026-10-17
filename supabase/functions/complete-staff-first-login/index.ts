@@ -66,5 +66,13 @@ Deno.serve(async (req: Request) => {
     // Password has changed. Keep pending status so staff cannot access business data.
     return json({error:"Password changed, but activation could not finish. Sign in using the new password and complete activation again."},503);
   }
-  return json({ok:true,message:"Password changed. Sign in again using your new password."});
+  // Supabase access tokens can survive a sign-out until JWT expiry.
+  // The DB now rejects every session created before first_login_completed_at.
+  // Also revoke refresh tokens on every device as defense in depth.
+  const { error:revokeError } = await admin.auth.admin.signOut(token,"global");
+  return json({ok:true,
+    message:"Password changed. Sign in again using your new password.",
+    old_sessions_revoke_attempted:true,
+    old_sessions_revoked:revokeError===null});
+
 });
