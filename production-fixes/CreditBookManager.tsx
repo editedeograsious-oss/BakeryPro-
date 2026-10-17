@@ -23,7 +23,7 @@ export default function CreditBookManager({accounts,ledger,live,canSetTerms,canP
 
   async function saveTerms(){
     if(!selected)return;if(limit<0||terms<0){setMessage("Credit limit and terms must be valid.");return;}if(!live){setMessage("Demo mode: credit terms simulated.");return;}
-    setBusy(true);setMessage("");try{const supabase=createClient();const {error}=await supabase.rpc("save_customer_credit_terms",{p_customer_id:selected.customer_id,p_enabled:enabled,p_credit_limit:limit,p_terms_days:terms,p_notes:notes.trim()||null});if(error)throw error;setMessage("Customer credit terms updated.");router.refresh();}catch(e){setMessage(e instanceof Error?e.message:"Could not save credit terms.");}finally{setBusy(false);}
+    setBusy(true);setMessage("");try{const supabase=createClient();const {error}=await supabase.rpc("save_customer_credit_terms",{p_customer_id:selected.customer_id,p_enabled:enabled,p_credit_limit:limit,p_terms_days:terms,p_notes:notes.trim()||null});if(error)throw error;setMessage("Customer credit terms updated.");router.refresh();}catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not save credit terms.");}finally{setBusy(false);}
   }
   async function recordPayment(){
     if(!canPostTransactions){setMessage("Credit repayments are locked while live operations are off.");return;}
@@ -36,7 +36,7 @@ export default function CreditBookManager({accounts,ledger,live,canSetTerms,canP
     if(payAmount>due){setMessage("Payment cannot exceed the customer's outstanding balance of "+ugx(due)+".");return;}
     if(method!=="cash"&&!reference.trim()){setMessage("Reference is required for non-cash payment.");return;}
     if(!live){setMessage("Demo mode: credit payment simulated.");return;}
-    setBusy(true);setMessage("");try{const supabase=createClient();const {error}=await supabase.rpc("record_credit_payment",{p_customer_id:selected.customer_id,p_amount:payAmount,p_method:method,p_reference:reference.trim()||null,p_notes:"Credit book repayment",p_client_request_id:req.current});if(error)throw error;req.current=crypto.randomUUID();setPayAmount(0);setReference("");setMessage("Credit payment saved successfully in the shared database. Refreshed ledger will show the repayment.");router.refresh();}catch(e){setMessage(e instanceof Error?e.message:"Could not record payment.");}finally{setBusy(false);}
+    setBusy(true);setMessage("");try{const supabase=createClient();const {error}=await supabase.rpc("record_credit_payment",{p_customer_id:selected.customer_id,p_amount:payAmount,p_method:method,p_reference:reference.trim()||null,p_notes:"Credit book repayment",p_client_request_id:req.current});if(error)throw error;req.current=crypto.randomUUID();setPayAmount(0);setReference("");setMessage("Credit payment saved successfully in the shared database. Refreshed ledger will show the repayment.");router.refresh();}catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not record payment.");}finally{setBusy(false);}
   }
 
   async function adjustCreditSale(row:any){
@@ -51,7 +51,7 @@ export default function CreditBookManager({accounts,ledger,live,canSetTerms,canP
     if(!live){setMessage("Demo mode: credit adjustment simulated.");return;}
     setBusy(true);setMessage("");
     try{const supabase=createClient();const {error}=await supabase.rpc("adjust_unpaid_credit_sale",{p_sale_id:row.sale_id,p_amount:amount,p_reason:reason.trim()});if(error)throw error;setMessage("Unpaid credit reduced with an audited adjustment.");router.refresh();}
-    catch(e){setMessage(e instanceof Error?e.message:"Could not adjust the credit sale.");}
+    catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not adjust the credit sale.");}
     finally{setBusy(false);}
   }
 
