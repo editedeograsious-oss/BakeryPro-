@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { StaffRole } from "@/lib/permissions";
+import NotificationCenter from "@/components/notifications/NotificationCenter";
 
 type MenuItem={href:string;label:string;roles:StaffRole[]};
 type MenuSection={title:string;items:MenuItem[]};
@@ -44,6 +45,9 @@ const sections:MenuSection[]=[
     {href:"/suppliers",label:"Suppliers",roles:["owner","manager","storekeeper"]},
     {href:"/purchases",label:"Purchases & Receiving",roles:["owner","manager","storekeeper"]},
     {href:"/supplier-accounts",label:"Supplier Accounts",roles:ownerManager},
+  ]},
+  {title:"Notifications",items:[
+    {href:"/notifications",label:"All Notifications",roles:all},
   ]},
   {title:"Customers & Growth",items:[
     {href:"/customers",label:"Customers",roles:["owner","manager","cashier"]},
@@ -156,6 +160,7 @@ export default function Sidebar(){
       <div className="sidebar-profile-card">
         <div className="sidebar-profile-name">{name}</div>
         <div className="sidebar-profile-role">{role?roleLabels[role]:(loaded?"No active staff session":"Loading menu…")}</div>
+        {role&&<NotificationCenter view="bell"/>}
         <div style={{marginTop:8}}>
           {operationsOpen===null?<span className="badge gold">Checking live status…</span>:operationsOpen?<span className="badge green">Live Operations Enabled</span>:<span className="badge red">Live Operations Locked</span>}
         </div>
