@@ -30,7 +30,7 @@ async function main(){
  assert(add,"Product button exists");add.props.onClick();
  assert(!button(pos.render(),"Complete and Save Sale").props.disabled,"Sale button enabled with shift open");
  await button(pos.render(),"Complete and Save Sale").props.onClick();
- assert(sent.some(x=>x.name==="complete_sale_with_customer"),"Sale is posted to central RPC");
+ assert(sent.some(x=>x.name==="complete_sale_v038"&&x.args.p_manual_discount===0&&x.args.p_promo_code===null),"Sale is posted through controlled v0.38 RPC");
  assert(text(pos.render()).includes("SAVED"),"Confirmation states cloud save");
  const locked=harness("PosTerminal.tsx",{products:[product],openShift:{id:"s"},customers:[],live:true,canPost:false},client,{
   "@/lib/pos":{subtotal:()=>0,discountAmount:()=>0,grandTotal:()=>0,changeDue:()=>0},
