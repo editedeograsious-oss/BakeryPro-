@@ -6,7 +6,7 @@ async function main(){
   from:()=>{const o={select:()=>o,order:()=>o,limit:async()=>({data:[{id:"1",sale_no:"SALE-TEST-001",status:"completed",total:5000,created_at:new Date().toISOString(),held:false,cashier_id:"1"}],error:null})};return o;},
   channel:()=>({on(){return this;},subscribe(){return this;}}),removeChannel:async()=>{}
  };
- const product={id:"product-001",name:"Audit Bread",selling_price:5000,category_name:"Bakery"};
+ const product={id:"product-001",name:"Audit Bread",selling_price:5000,category_name:"Bakery",available_qty:5};
  const pos=harness("PosTerminal.tsx",{products:[product],openShift:{id:"shift1"},customers:[],live:true,canPost:true},client,{
   "@/lib/pos":{
    subtotal:(cart)=>cart.reduce((s,c)=>s+c.quantity*c.unitPrice,0),
@@ -38,6 +38,31 @@ async function main(){
  });
  assert(text(locked.render()).includes("Live sales are locked"),"Cutover lock explained");
  assert(button(locked.render(),"Complete and Save Sale").props.disabled,"Locked POS disallows posting");
- console.log("PASS: POS amount clearing, no leading zeros, shared cloud RPC, save feedback and cutover lock.");
+ const noStock=harness("PosTerminal.tsx",{
+  products:[{...product,available_qty:0}],openShift:{id:"shift1"},customers:[],live:true,canPost:true
+ },client,{"@/lib/pos":{subtotal:()=>0,discountAmount:()=>0,grandTotal:()=>0,changeDue:()=>0},
+   "@/components/Sidebar":{default:()=>null}});
+ const noStockProduct=find(noStock.render(),x=>x.type==="button"&&text(x).includes("Audit Bread"))[0];
+ assert(noStockProduct.props.disabled,"Product button blocked when there are no finished batches");
+ assert(text(noStock.render()).includes("Out of stock"),"POS shows why bakery goods cannot be sold");
+
+ const dbFailure={message:"Insufficient finished-goods stock for product 123 (short by 2.000)",code:"P0001",details:"",hint:""};
+ const problemClient={...client,rpc:async(name,args)=>name==="complete_sale_v038"
+   ?{data:null,error:dbFailure}:{data:[],error:null}};
+ const failed=harness("PosTerminal.tsx",{products:[product],openShift:{id:"shift1"},customers:[],live:true,canPost:true},
+  problemClient,{"@/lib/pos":{
+    subtotal:(cart)=>cart.reduce((s,c)=>s+c.quantity*c.unitPrice,0),
+    discountAmount:(s,t,v)=>t==="percent"?s*v/100:Math.min(s,v),
+    grandTotal:(s,d)=>s-d,
+    changeDue:(r,t)=>Math.max(0,r-t)
+   },"@/components/Sidebar":{default:()=>null}});
+ const cash=find(failed.render(),x=>typeof x.type==="function" && x.type.name==="MoneyInput" && x.props.label==="Cash received")[0];
+ find(cash.type(cash.props),x=>x.type==="input")[0].props.onChange({target:{value:"5000"}});
+ find(failed.render(),x=>x.type==="button"&&text(x).includes("Audit Bread"))[0].props.onClick();
+ await button(failed.render(),"Complete and Save Sale").props.onClick();
+ assert(text(failed.render()).includes("Insufficient finished-goods stock"),"Actual Supabase database error displayed");
+ assert(text(failed.render()).includes("Not enough finished goods"),"Stock repair guidance displayed");
+ assert(text(failed.render()).includes("SALE NOT SAVED"),"Failure must never report successful save");
+ console.log("PASS: POS stock availability, safe sale blocking, database error visibility and existing save tests.");
 }
 main().catch(err=>{console.error(err);process.exitCode=1;});
