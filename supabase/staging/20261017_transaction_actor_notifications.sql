@@ -6,6 +6,21 @@ DO $stage$ BEGIN
 END $stage$;
 
 ALTER TABLE public.staff_notifications
+ DROP CONSTRAINT IF EXISTS staff_notifications_event_type_check,
+ ADD CONSTRAINT staff_notifications_event_type_check
+ CHECK (event_type IN ('new_order','order_status','low_stock','transaction'));
+
+ALTER TABLE public.staff_notifications
+ DROP CONSTRAINT IF EXISTS staff_notifications_target_path_check,
+ ADD CONSTRAINT staff_notifications_target_path_check
+ CHECK (target_path IN (
+   '/customer-orders','/inventory','/pos','/cash-movements','/expenses',
+   '/stock-movements','/purchases','/finished-goods','/waste','/production',
+   '/purchase-orders','/supplier-accounts','/daily-closing','/payroll',
+   '/products','/activity-log'
+ ));
+
+ALTER TABLE public.staff_notifications
  ADD COLUMN IF NOT EXISTS actor_id uuid,
  ADD COLUMN IF NOT EXISTS actor_name text,
  ADD COLUMN IF NOT EXISTS actor_role text,
