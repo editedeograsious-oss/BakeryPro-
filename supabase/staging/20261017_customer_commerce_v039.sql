@@ -37,7 +37,7 @@ AS $function$
  FROM public.product_reviews r JOIN public.products p ON p.id=r.product_id
  WHERE r.product_id=p_product_id AND r.status='approved' AND p.status='active' AND p.online_available
  ORDER BY r.created_at DESC LIMIT 30;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.owner_moderate_product_review(p_review_id uuid, p_approve boolean)
  RETURNS void
@@ -52,7 +52,7 @@ BEGIN
  IF NOT FOUND THEN RAISE EXCEPTION 'Review not found'; END IF;
  INSERT INTO public.audit_logs(actor_id,action,entity,entity_id,after_data)
  VALUES(auth.uid(),'moderate_product_review','product_review',p_review_id,jsonb_build_object('approved',p_approve));
-END;$function$
+END;$function$;
 
 CREATE OR REPLACE FUNCTION public.owner_set_product_image(p_product_id uuid, p_path text)
  RETURNS void
@@ -72,7 +72,7 @@ BEGIN
  UPDATE public.products SET image_url=v_url,updated_at=now() WHERE id=p_product_id;
  INSERT INTO public.audit_logs(actor_id,action,entity,entity_id,after_data)
  VALUES (auth.uid(),'set_product_image','product',p_product_id,jsonb_build_object('storage_path',p_path));
-END;$function$
+END;$function$;
 
 CREATE OR REPLACE FUNCTION public.owner_set_product_online(p_product_id uuid, p_available boolean)
  RETURNS void
@@ -89,7 +89,7 @@ BEGIN
  UPDATE public.products SET online_available=p_available,updated_at=now() WHERE id=p_product_id;
  INSERT INTO public.audit_logs(actor_id,action,entity,entity_id,after_data)
  VALUES (auth.uid(),'set_online_product_availability','product',p_product_id,jsonb_build_object('online_available',p_available));
-END;$function$
+END;$function$;
 
 CREATE OR REPLACE FUNCTION public.public_product_catalog()
  RETURNS TABLE(id uuid, name text, description text, selling_price numeric, image_url text, category_name text, category_display_order integer, product_updated_at timestamp with time zone)
@@ -101,7 +101,7 @@ SELECT p.id,p.name,p.description,p.selling_price,p.image_url,pc.name,coalesce(pc
 FROM public.products p LEFT JOIN public.product_categories pc ON pc.id=p.category_id
 WHERE p.status='active' AND p.online_available
 ORDER BY coalesce(pc.display_order,0),pc.name NULLS LAST,p.name;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.submit_public_order(p_full_name text, p_phone text, p_email text, p_fulfillment fulfillment_type, p_required_at timestamp with time zone, p_delivery_address text, p_notes text, p_items jsonb, p_client_request_id uuid DEFAULT NULL::uuid)
  RETURNS jsonb
@@ -166,7 +166,7 @@ BEGIN
  ON CONFLICT (product_id,order_id) DO NOTHING RETURNING id INTO v_id;
  IF v_id IS NULL THEN RAISE EXCEPTION 'This product has already been reviewed for that order'; END IF;
  RETURN v_id;
-END;$function$
+END;$function$;
 
 REVOKE ALL ON FUNCTION public.owner_set_product_online(uuid,boolean) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.owner_set_product_online(uuid,boolean) TO authenticated;
