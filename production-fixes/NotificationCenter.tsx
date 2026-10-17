@@ -8,10 +8,14 @@ type Notice = {
   id:string;
   recipient_id:string;
   event_key:string;
-  event_type:"new_order"|"order_status"|"low_stock";
+  event_type:"new_order"|"order_status"|"low_stock"|"transaction";
+  actor_id?:string|null;
+  actor_name?:string|null;
+  actor_role?:string|null;
+  source_audit_id?:number|null;
   title:string;
   body:string;
-  target_path:"/customer-orders"|"/inventory";
+  target_path:string;
   created_at:string;
   read_at:string|null;
 };
@@ -36,7 +40,7 @@ export default function NotificationCenter({view="bell"}:{view?:"bell"|"history"
       if(!active||!uid)return;
       const [rows,number]=await Promise.all([
         client.from("staff_notifications")
-          .select("id,recipient_id,event_key,event_type,title,body,target_path,created_at,read_at")
+          .select("id,recipient_id,event_key,event_type,title,body,target_path,created_at,read_at,actor_id,actor_name,actor_role,source_audit_id")
           .eq("recipient_id",uid).order("created_at",{ascending:false}).limit(view==="history"?100:30),
         client.from("staff_notifications").select("id",{count:"exact",head:true})
           .eq("recipient_id",uid).is("read_at",null)
@@ -122,7 +126,18 @@ export default function NotificationCenter({view="bell"}:{view?:"bell"|"history"
 
   function formatTime(value:string){
     const date=new Date(value);
-    return Number.isFinite(date.valueOf())?date.toLocaleString("en-UG",{dateStyle:"medium",timeStyle:"short"}):"Recently";
+    return Number.isFinite(date.valueOf())?date.toLocaleString("en-UG",{dateStyle:"medium",timeStyle:"short",timeZone:"Africa/Kampala"})+" EAT":"Recently";
+  }
+  function actorLabel(item:Notice){
+    if(item.actor_name){
+      const roleNames:Record<string,string>={owner:"CEO / Owner",manager:"General Manager",
+        cashier:"Cashier",baker:"Baker",storekeeper:"Stock Manager",viewer:"View-Only Staff"};
+      const role=item.actor_role ? (roleNames[item.actor_role]||item.actor_role) : "";
+      return item.actor_name + (role?" — "+role:"");
+    }
+    if(item.event_type==="transaction")return "No verified staff identity (system or external entry)";
+    if(item.event_type==="new_order")return "Online customer or system (no staff account)";
+    return null;
   }
   const list=view==="bell"?items.slice(0,5):items;
 
@@ -135,7 +150,7 @@ export default function NotificationCenter({view="bell"}:{view?:"bell"|"history"
         <strong aria-live="polite">{unread>99?"99+":unread}</strong>
       </button>
     </>:<header className="pagehead">
-      <div><h1>Notification Centre</h1><p>Order updates, urgent stock alerts and messages for your staff role.</p></div>
+      <div><h1>Notification Centre</h1><p>Sales, cash, expenses, stock and other transaction alerts showing the responsible staff member.</p></div>
       <span className="badge gold">{unread} unread</span>
     </header>}
 
@@ -152,6 +167,9 @@ export default function NotificationCenter({view="bell"}:{view?:"bell"|"history"
           <small>{formatTime(n.created_at)}</small>
         </div>
         <p style={{fontSize:13,margin:"5px 0"}}>{n.body}</p>
+        {actorLabel(n)&&<p style={{fontSize:12,margin:"5px 0",fontWeight:500}}>
+          <strong>{n.event_type==="new_order"&&!n.actor_name?"Source:":"Recorded by:"}</strong> {actorLabel(n)}
+        </p>}
         <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center"}}>
           <Link href={n.target_path} onClick={()=>{void readOne(n);setOpen(false);}}>View details</Link>
           {!n.read_at&&<button type="button" disabled={busy}
@@ -169,6 +187,9 @@ export default function NotificationCenter({view="bell"}:{view?:"bell"|"history"
         <button aria-label="Close notification" type="button" onClick={()=>setNotice(null)}>×</button>
       </div>
       <p style={{margin:"10px 0"}}>{notice.body}</p>
+      {actorLabel(notice)&&<p style={{fontSize:12,margin:"8px 0"}}>
+        <strong>{notice.event_type==="new_order"&&!notice.actor_name?"Source:":"Recorded by:"}</strong> {actorLabel(notice)}
+      </p>}
       <div style={{display:"flex",gap:12}}>
         <Link href={notice.target_path} onClick={()=>{void readOne(notice);setNotice(null);}}>View details</Link>
         <button type="button" onClick={()=>{void readOne(notice);setNotice(null);}} disabled={busy}>Mark read</button>
