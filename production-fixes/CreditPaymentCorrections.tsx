@@ -38,7 +38,7 @@ export default function CreditPaymentCorrections({live,canCorrect,canPostTransac
       setMessage("Credit repayment reversed. Enter the correct repayment if needed.");
       await load();
       router.refresh();
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not reverse credit payment.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not reverse credit payment.");}
     finally{setBusy(false);}
   }
 
@@ -54,7 +54,7 @@ export default function CreditPaymentCorrections({live,canCorrect,canPostTransac
       setMessage("Credit repayment restored.");
       await load();
       router.refresh();
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not restore credit payment.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not restore credit payment.");}
     finally{setBusy(false);}
   }
 
