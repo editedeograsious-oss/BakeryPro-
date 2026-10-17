@@ -69,7 +69,11 @@ const sections:MenuSection[]=[
     {href:"/branches",label:"Branches & Locations",roles:["owner"]},
     {href:"/permission-overrides",label:"Individual Permissions",roles:["owner"]},
   ]},
-  {title:"Website",items:[{href:"/public-site-settings",label:"Public Website Settings",roles:ownerManager}]},
+  {title:"Website",items:[
+  {href:"/owner-commerce",label:"Online Shop & Photos",roles:["owner"]},
+  {href:"/shop",label:"View Customer Shop",roles:ownerManager},
+  {href:"/public-site-settings",label:"Public Website Settings",roles:ownerManager}
+]},
   {title:"Data Management",items:[{href:"/recycle-bin",label:"Recycle Bin",roles:ownerManager}]},
   {title:"Opening Setup",items:[{href:"/opening-balances",label:"Opening Stock & Customer Debts",roles:ownerManager}]},
 ];
