@@ -57,6 +57,7 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && mkdir -p /app/site/components/sync \
   && cp /tmp/production-fixes/SharedDataRefresh.tsx /app/site/components/sync/SharedDataRefresh.tsx \
   && cp /tmp/production-fixes/pos-page.tsx /app/site/app/pos/page.tsx \
+  && mkdir -p /app/site/components/commerce \
   && cp /tmp/production-fixes/PosTerminal.tsx /app/site/components/core/PosTerminal.tsx \
   && mkdir -p /app/site/app/shop/account /app/site/app/shop/auth/callback \
   && cp /tmp/production-fixes/CustomerAccount.tsx /app/site/components/commerce/CustomerAccount.tsx \
