@@ -54,12 +54,29 @@ export default async function Dashboard(){
 
   let dashboard:any={summary:[],bestSellers:[],lowStock:[],recentActivity:[],trend:[]};
   let alerts:any[]=[];
+  let detailedReportWarning="";
+  let salesSummaryError="";
+  let latestRecordedSale:any=null;
 
   try {
     dashboard=await getOwnerDashboard("day");
   } catch {
-    // Keep the dashboard usable even if an optional reporting query is temporarily unavailable.
+    detailedReportWarning="Some detailed dashboard reports could not load. Other totals are checked directly.";
   }
+
+  // Verify the main totals directly against the shared reporting RPC.
+  // Never silently display zero when that reporting query fails.
+  const [liveSummary,lastSaleResult]=await Promise.all([
+    supabase.rpc("owner_dashboard_summary",{p_period:"day"}),
+    supabase.from("sales").select("id,sale_no,total,status,created_at,held")
+      .order("created_at",{ascending:false}).limit(1)
+  ]);
+  if(liveSummary.error){
+    salesSummaryError="Today's sales could not be verified: "+liveSummary.error.message;
+  } else {
+    dashboard.summary=liveSummary.data??[];
+  }
+  if(!lastSaleResult.error)latestRecordedSale=lastSaleResult.data?.[0]??null;
 
   try {
     const {data}=await supabase.rpc("management_alerts");
@@ -99,8 +116,24 @@ export default async function Dashboard(){
 
     <div className="hero">
       <h2>Today's Business at a Glance</h2>
-      <p>Live figures from the shared DS Bakery database. All money values are in Uganda shillings.</p>
+      <p>Live figures from the shared DS Bakery database. All money values are in Uganda shillings. Business day uses Uganda time (EAT, UTC+3).</p>
+      <div style={{display:"flex",gap:12,flexWrap:"wrap",alignItems:"center",fontSize:13}}>
+        <a href="/dashboard" className="btn secondary">Reload latest figures</a>
+        <span>Report checked: {new Date().toLocaleString("en-UG",{timeZone:"Africa/Kampala",dateStyle:"medium",timeStyle:"short"})} EAT</span>
+      </div>
     </div>
+    {salesSummaryError&&<div className="hero" role="alert" style={{border:"2px solid #a64024",marginTop:12}}>
+      <strong>Sales report unavailable.</strong> {salesSummaryError} Do not interpret displayed zeros as confirmed sales figures.
+    </div>}
+    {detailedReportWarning&&<p role="alert" style={{padding:12}}>{detailedReportWarning}</p>}
+    {!salesSummaryError&&<p style={{fontSize:13,margin:"12px 0",color:"var(--muted)"}}>
+      {latestRecordedSale?
+        <>Latest saved POS sale: <strong>{latestRecordedSale.sale_no||String(latestRecordedSale.id).slice(0,8)}</strong>
+        {" • "}{ugx(num(latestRecordedSale.total))}{" • "}{timeLabel(latestRecordedSale.created_at)} EAT.
+        {num(today.transaction_count)===0?" No completed POS sale has been recorded for the current Uganda business day.":""}</>
+        :"No POS sale has been saved to this shared staging database yet."}
+      {" "}<Link href="/pos">Check POS sales history</Link>
+    </p>}
 
     <div className="grid4">
       <div className="card stat"><div className="label">Today's Sales</div><div className="value" style={{fontSize:24}}>{ugx(num(today.sales))}</div><div style={{marginTop:6,color:"var(--muted)",fontSize:12}}>{num(today.transaction_count)} transaction(s)</div></div>
