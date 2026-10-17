@@ -143,7 +143,16 @@ export default function PosTerminal({products,openShift,customers,live,canPost=t
         <input id="pos-approval-pin" type="password" autoComplete="off" value={approvalPin}
           onChange={e=>setApprovalPin(e.target.value)} placeholder="Only if the discount requires approval"/>
         <small>Never share this PIN in messages.</small></div>
+      {!openShift&&<p role="alert" style={{padding:"10px 12px",border:"1px solid #b43f30",borderRadius:8,marginBottom:8}}>
+        <strong>Cannot save a sale yet:</strong> You must <a href="/shifts">open your own cashier shift</a> first.
+      </p>}
+      {!canPost&&live&&<p role="alert"><strong>Posting disabled:</strong> live business operations are currently locked.</p>}
       <button className="btn primary" disabled={busy||!openShift||!cart.length||!live||!canPost} onClick={()=>submit(false)} style={{width:"100%",marginTop:9}}>{busy?"Saving…":"Complete and Save Sale"}</button>
+      {message&&<div role={message.startsWith("SALE NOT SAVED")?"alert":"status"}
+          style={{marginTop:10,padding:12,borderRadius:8,border:"1px solid #bda486",background:message.startsWith("SALE NOT SAVED")?"#fff1ef":"#f1fbf4"}}>
+        <strong>{message}</strong>
+        {message.startsWith("SALE NOT SAVED")&&<p style={{fontSize:12,margin:"6px 0 0"}}>This transaction has NOT reached the shared sales database. Fix the stated issue and try again.</p>}
+      </div>}
       </section>
     </div>
     <section className="card" style={{marginTop:16}}><div className="pagehead"><div><h2>Shared POS Sales History</h2><p>Saved cloud transactions visible to authorized staff. Customer web orders remain separate until processed.</p></div>
