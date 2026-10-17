@@ -2,6 +2,9 @@ import Link from "next/link";
 import Sidebar from "@/components/Sidebar";
 import { deploymentEnvironment, runtimeMode } from "@/lib/runtime";
 import { requirePermission } from "@/lib/access";
+import { getCurrentStaff } from "@/lib/auth";
+import { staffHomePath } from "@/lib/staffHome";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getOwnerDashboard } from "@/lib/repositories/reports";
 import { ugx } from "@/lib/costing";
@@ -46,6 +49,14 @@ function timeLabel(value:any){
 }
 
 export default async function Dashboard(){
+  // Authenticated cashiers, bakers and stock staff should never be routed into
+  // the owner-only dashboard. Keep the existing permission guard for owners
+  // and managers; this does NOT grant dashboard access to other roles.
+  const staff=await getCurrentStaff();
+  if(staff){
+    const home=staffHomePath(staff.profile.role);
+    if(home!=="/dashboard")redirect(home);
+  }
   await requirePermission("dashboard:view");
 
   const mode=runtimeMode();
