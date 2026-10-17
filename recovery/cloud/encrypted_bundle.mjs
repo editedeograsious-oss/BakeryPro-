@@ -43,9 +43,14 @@ export async function decryptBundle(input,output,passphrase) {
   const decipher=createDecipheriv('aes-256-gcm',key(passphrase,salt),iv);
   decipher.setAAD(header);decipher.setAuthTag(tag);
   const temporary=path.join(path.dirname(path.resolve(output)),'.ds-bakery-decrypt-'+randomBytes(12).toString('hex'));
+  // Create the protected output synchronously before pipeline can reject.
+  // With flags:'wx', a delayed WriteStream open could create this file AFTER
+  // the finally/unlink cleanup on a malformed or tampered encrypted input.
+  fs.writeFileSync(temporary,Buffer.alloc(0),{flag:'wx',mode:0o600});
   try {
     const ciphertext=length===headerBytes+tagBytes?Readable.from([]):fs.createReadStream(input,{start:headerBytes,end:length-tagBytes-1});
-    await pipeline(ciphertext,decipher,fs.createWriteStream(temporary,{flags:'wx',mode:0o600}));
+    // r+ never recreates a file after cleanup; it only opens the file above.
+    await pipeline(ciphertext,decipher,fs.createWriteStream(temporary,{flags:'r+',mode:0o600}));
     // Link rather than overwrite another file that may have appeared during decryption.
     fs.linkSync(temporary,output);
   } finally {fs.rmSync(temporary,{force:true});}
