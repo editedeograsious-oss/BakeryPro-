@@ -191,8 +191,8 @@ export default function PurchaseOrderManager({
         <div className="field"><label>Invoice date</label><input type="date" value={editInvoiceDate} onChange={e=>setEditInvoiceDate(e.target.value)}/></div>
       </div>
       <div className="grid2">
-        <div className="field"><label>Credit terms (days)</label><input type="number" min="0" value={editCreditDays} onChange={e=>setEditCreditDays(Number(e.target.value))}/></div>
-        <div className="field"><label>Discount (UGX)</label><input type="number" min="0" value={editDiscount} onChange={e=>setEditDiscount(Number(e.target.value))}/></div>
+        <div className="field"><label>Credit terms (days)</label><input type="number" min="0" value={editCreditDays===0?"":editCreditDays} onChange={e=>setEditCreditDays(Number(e.target.value))}/></div>
+        <div className="field"><label>Discount (UGX)</label><input type="number" min="0" value={editDiscount===0?"":editDiscount} onChange={e=>setEditDiscount(Number(e.target.value))}/></div>
       </div>
 
       {editLines.map((line,i)=>{
@@ -201,8 +201,8 @@ export default function PurchaseOrderManager({
           <div className="field"><label>Material</label><select value={line.raw_material_id} onChange={e=>setEditLines(prev=>prev.map((x,j)=>j===i?{...x,raw_material_id:e.target.value}:x))}>{materials.map(m=><option key={m.id} value={m.id}>{m.name} ({m.base_unit})</option>)}</select></div>
           <div>
             <div className="grid2">
-              <div className="field"><label>Qty ({m?.base_unit??"base"})</label><input type="number" min="0.000001" step="any" value={line.ordered_qty_base} onChange={e=>setEditLines(prev=>prev.map((x,j)=>j===i?{...x,ordered_qty_base:Number(e.target.value)}:x))}/></div>
-              <div className="field"><label>Cost / {m?.base_unit??"unit"} (UGX)</label><input type="number" min="0" step="any" value={line.unit_cost_base} onChange={e=>setEditLines(prev=>prev.map((x,j)=>j===i?{...x,unit_cost_base:Number(e.target.value)}:x))}/></div>
+              <div className="field"><label>Qty ({m?.base_unit??"base"})</label><input type="number" min="0.000001" step="any" value={line.ordered_qty_base===0?"":line.ordered_qty_base} onChange={e=>setEditLines(prev=>prev.map((x,j)=>j===i?{...x,ordered_qty_base:Number(e.target.value)}:x))}/></div>
+              <div className="field"><label>Cost / {m?.base_unit??"unit"} (UGX)</label><input type="number" min="0" step="any" value={line.unit_cost_base===0?"":line.unit_cost_base} onChange={e=>setEditLines(prev=>prev.map((x,j)=>j===i?{...x,unit_cost_base:Number(e.target.value)}:x))}/></div>
             </div>
             {editLines.length>1&&<button className="btn secondary" onClick={()=>removeEditLine(i)} type="button">Remove line</button>}
           </div>
@@ -226,8 +226,8 @@ export default function PurchaseOrderManager({
         <div className="field"><label>Invoice date (optional)</label><input type="date" value={invoiceDate} onChange={e=>setInvoiceDate(e.target.value)}/></div>
       </div>
       <div className="grid2">
-        <div className="field"><label>Credit terms (days)</label><input type="number" min="0" value={creditDays} onChange={e=>setCreditDays(Number(e.target.value))}/></div>
-        <div className="field"><label>Discount (UGX)</label><input type="number" min="0" value={discount} onChange={e=>setDiscount(Number(e.target.value))}/></div>
+        <div className="field"><label>Credit terms (days)</label><input type="number" min="0" value={creditDays===0?"":creditDays} onChange={e=>setCreditDays(Number(e.target.value))}/></div>
+        <div className="field"><label>Discount (UGX)</label><input type="number" min="0" value={discount===0?"":discount} onChange={e=>setDiscount(Number(e.target.value))}/></div>
       </div>
 
       {lines.map((line,i)=>{
@@ -236,8 +236,8 @@ export default function PurchaseOrderManager({
           <div className="field"><label>Material</label><select value={line.raw_material_id} onChange={e=>setLines(prev=>prev.map((x,j)=>j===i?{...x,raw_material_id:e.target.value}:x))}>{materials.map(m=><option key={m.id} value={m.id}>{m.name} ({m.base_unit})</option>)}</select></div>
           <div>
             <div className="grid2">
-              <div className="field"><label>Qty ({m?.base_unit??"base"})</label><input type="number" min="0.000001" step="any" value={line.ordered_qty_base} onChange={e=>setLines(prev=>prev.map((x,j)=>j===i?{...x,ordered_qty_base:Number(e.target.value)}:x))}/></div>
-              <div className="field"><label>Cost / {m?.base_unit??"unit"} (UGX)</label><input type="number" min="0" step="any" value={line.unit_cost_base} onChange={e=>setLines(prev=>prev.map((x,j)=>j===i?{...x,unit_cost_base:Number(e.target.value)}:x))}/></div>
+              <div className="field"><label>Qty ({m?.base_unit??"base"})</label><input type="number" min="0.000001" step="any" value={line.ordered_qty_base===0?"":line.ordered_qty_base} onChange={e=>setLines(prev=>prev.map((x,j)=>j===i?{...x,ordered_qty_base:Number(e.target.value)}:x))}/></div>
+              <div className="field"><label>Cost / {m?.base_unit??"unit"} (UGX)</label><input type="number" min="0" step="any" value={line.unit_cost_base===0?"":line.unit_cost_base} onChange={e=>setLines(prev=>prev.map((x,j)=>j===i?{...x,unit_cost_base:Number(e.target.value)}:x))}/></div>
             </div>
             {lines.length>1&&<button className="btn secondary" onClick={()=>removeLine(i)} type="button">Remove line</button>}
           </div>
