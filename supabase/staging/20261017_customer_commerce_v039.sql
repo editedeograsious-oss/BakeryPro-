@@ -113,9 +113,9 @@ declare v_customer uuid;v_order uuid:=gen_random_uuid();v_order_no text;v_item j
 begin
   if not public.public_ordering_status() then raise exception 'Online ordering is not currently available'; end if;
   if coalesce(trim(p_full_name),'')='' or coalesce(trim(p_phone),'')='' then raise exception 'Name and phone are required'; end if;
-  if p_required_at<=now() then raise exception 'Required date/time must be in the future'; end if;
-  if p_fulfillment='delivery' and coalesce(trim(p_delivery_address),'')='' then raise exception 'Delivery address is required'; end if;
-  if jsonb_typeof(p_items)<>'array' or jsonb_array_length(p_items)=0 or jsonb_array_length(p_items)>20 then raise exception 'Order must contain 1 to 20 products'; end if;
+  if p_required_at is null or p_required_at<=now() then raise exception 'Required date/time must be in the future'; end if;
+  if p_fulfillment='delivery' and (not coalesce((select delivery_enabled from public.public_site_settings where id=1),false) or coalesce(trim(p_delivery_address),'')='') then raise exception 'Delivery address is required'; end if;
+  if coalesce(jsonb_typeof(p_items),'null')<>'array' or jsonb_array_length(p_items)=0 or jsonb_array_length(p_items)>20 then raise exception 'Order must contain 1 to 20 products'; end if;
   if p_client_request_id is not null then select id into v_existing from public.customer_orders where client_request_id=p_client_request_id; if v_existing is not null then return jsonb_build_object('order_id',v_existing,'order_no',(select order_no from public.customer_orders where id=v_existing),'duplicate',true); end if; end if;
   select id into v_customer from public.customers where phone=trim(p_phone) limit 1;
   if v_customer is null then
@@ -123,7 +123,7 @@ begin
     values(trim(p_full_name),trim(p_phone),nullif(trim(p_email),''),case when p_fulfillment='delivery' then nullif(trim(p_delivery_address),'') end,true,null)
     returning id into v_customer;
   else
-    update public.customers set full_name=coalesce(nullif(trim(p_full_name),''),full_name),email=coalesce(nullif(trim(p_email),''),email),updated_at=now() where id=v_customer;
+    null;
   end if;
   v_order_no:=public.next_customer_order_no();
   insert into public.customer_orders(id,order_no,customer_id,status,fulfillment,required_at,delivery_address,notes,created_by,client_request_id,order_source)
@@ -141,6 +141,7 @@ begin
   values(null,'public_online_order','customer_order',v_order,jsonb_build_object('order_no',v_order_no,'customer_id',v_customer,'source','public_web'));
   return jsonb_build_object('order_id',v_order,'order_no',v_order_no,'total',(select total_amount from public.customer_orders where id=v_order),'duplicate',false);
 end;$function$
+
 
 CREATE OR REPLACE FUNCTION public.submit_verified_product_review(p_order_no text, p_phone text, p_product_id uuid, p_rating integer, p_display_name text, p_review_text text)
  RETURNS uuid
