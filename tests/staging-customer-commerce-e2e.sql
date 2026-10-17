@@ -31,11 +31,12 @@ DO $must_sign_in$ DECLARE blocked boolean:=false; BEGIN
 END $must_sign_in$;
 RESET ROLE;
 SELECT set_config('test.flow.phone','07'||substr(md5(gen_random_uuid()::text),1,12),true);
+SELECT set_config('test.flow.email',(SELECT email FROM auth.users WHERE id=current_setting('test.flow.owner')::uuid),true);
 SELECT set_config('request.jwt.claim.sub',current_setting('test.flow.owner'),true);
 SET LOCAL ROLE authenticated;
 SELECT set_config('test.flow.order',public.submit_public_order(
   'ROLLBACK E2E CUSTOMER',current_setting('test.flow.phone'),
-  (SELECT email FROM auth.users WHERE id=current_setting('test.flow.owner')::uuid),
+  current_setting('test.flow.email'),
   'pickup',now()+interval '2 days',null,'Automated integration fixture',
   jsonb_build_array(jsonb_build_object('product_id',current_setting('test.flow.product'),'quantity',2)),gen_random_uuid()
 )::text,true);
