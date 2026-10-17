@@ -9,6 +9,8 @@ DO $assert$ DECLARE blocked boolean:=false;BEGIN
  IF NOT blocked THEN RAISE EXCEPTION 'Guest order bypassed authentication';END IF;
 END $assert$;
 RESET ROLE;
+SELECT set_config('test.login.email',(SELECT u.email FROM public.profiles p JOIN auth.users u ON u.id=p.id
+ WHERE p.role='owner' AND p.active AND p.disabled_at IS NULL AND u.email_confirmed_at IS NOT NULL LIMIT 1),true);
 SELECT set_config('request.jwt.claim.sub',(SELECT p.id::text FROM public.profiles p JOIN auth.users u ON u.id=p.id
  WHERE p.role='owner' AND p.active AND p.disabled_at IS NULL AND u.email_confirmed_at IS NOT NULL LIMIT 1),true);
 SET LOCAL ROLE authenticated;
@@ -19,7 +21,7 @@ SET LOCAL ROLE authenticated;
 SELECT public.owner_set_product_online(current_setting('test.login.product')::uuid,true);
 SELECT set_config('test.login.order',public.submit_public_order(
  'ROLLBACK TEST CLIENT','07'||substr(md5(gen_random_uuid()::text),1,12),
- (SELECT email FROM auth.users WHERE id=auth.uid()),
+ current_setting('test.login.email'),
  'pickup',now()+interval '2 days',null,'Only test data',jsonb_build_array(jsonb_build_object('product_id',current_setting('test.login.product'),'quantity',2)),gen_random_uuid()
 )::text,true);
 DO $assert$ BEGIN
