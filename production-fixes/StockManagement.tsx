@@ -81,6 +81,7 @@ export default function StockManagement({
       </div>
       <div className="action-row">
         <Link className="btn secondary" href="/recipes">Recipes & Costing</Link>
+        <Link className="btn primary" href="/finished-goods">+ Add Finished Stock</Link>
         <Link className="btn secondary" href="/production">Production</Link>
       </div>
     </div>
@@ -166,6 +167,7 @@ export default function StockManagement({
         To add finished stock, first create a product and recipe, then confirm a production batch.
         For sold or wasted stock, use the existing correction or refund workflow so financial records remain consistent.
         <div className="action-row" style={{marginTop:12}}>
+          <Link className="btn primary" href="/finished-goods">+ Add Finished Stock</Link>
           <Link className="btn primary" href="/products">Manage Products</Link>
           <Link className="btn secondary" href="/production">Manage Production</Link>
           <Link className="btn secondary" href="/waste">Record Waste</Link>
