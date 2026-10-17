@@ -232,11 +232,11 @@ export default function PayrollManager({
         </div>
         <div className="grid2">
           <div className="field"><label>Salary type</label><select value={salaryType} onChange={e=>setSalaryType(e.target.value)}><option value="monthly">Monthly</option><option value="daily">Daily</option><option value="hourly">Hourly</option></select></div>
-          <div className="field"><label>Basic salary / rate</label><input type="number" min="0" value={basic} onChange={e=>setBasic(Number(e.target.value))}/></div>
+          <div className="field"><label>Basic salary / rate</label><input type="number" min="0" value={basic===0?"":basic} onChange={e=>setBasic(Number(e.target.value))}/></div>
         </div>
         <div className="grid2">
-          <div className="field"><label>Default allowances</label><input type="number" min="0" value={allowances} onChange={e=>setAllowances(Number(e.target.value))}/></div>
-          <div className="field"><label>Default deductions</label><input type="number" min="0" value={deductions} onChange={e=>setDeductions(Number(e.target.value))}/></div>
+          <div className="field"><label>Default allowances</label><input type="number" min="0" value={allowances===0?"":allowances} onChange={e=>setAllowances(Number(e.target.value))}/></div>
+          <div className="field"><label>Default deductions</label><input type="number" min="0" value={deductions===0?"":deductions} onChange={e=>setDeductions(Number(e.target.value))}/></div>
         </div>
         <div className="grid2">
           <div className="field"><label>Effective from</label><input type="date" value={effectiveFrom} onChange={e=>setEffectiveFrom(e.target.value)}/></div>
@@ -249,7 +249,7 @@ export default function PayrollManager({
         <h3 style={{color:"var(--brown)",marginTop:0}}>Salary Advance</h3>
         <p style={{color:"var(--muted)"}}>Advances remain open until deducted through payroll.</p>
         <div className="field"><label>Staff member</label><select value={staffId} onChange={e=>chooseStaff(e.target.value)}><option value="">Select staff</option>{activeStaff.map((s:any)=><option key={s.id} value={s.id}>{s.full_name}</option>)}</select></div>
-        <div className="field"><label>Advance amount</label><input type="number" min="0" value={advanceAmount} onChange={e=>setAdvanceAmount(Number(e.target.value))}/></div>
+        <div className="field"><label>Advance amount</label><input type="number" min="0" value={advanceAmount===0?"":advanceAmount} onChange={e=>setAdvanceAmount(Number(e.target.value))}/></div>
         <div className="field"><label>Reason</label><input value={advanceReason} onChange={e=>setAdvanceReason(e.target.value)} placeholder="Emergency advance / transport / other"/></div>
         <button className="btn secondary" disabled={transactionDisabled||!staffId} onClick={saveAdvance}>Record Advance</button>
         <div style={{marginTop:16,maxHeight:230,overflow:"auto"}}>
