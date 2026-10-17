@@ -89,8 +89,20 @@ export default function PosTerminal({products,openShift,customers,live,canPost=t
             p_hold:hold,p_customer_id:customerId||null,p_approval_pin:approvalPin.trim()||null
           });
       if(error)throw error;
-      const receipt=typeof data==="string"?data:typeof data==="object"?data?.sale_no??data?.sale_id??JSON.stringify(data):String(data);
-      setMessage((hold?"Sale held":"Sale completed")+" and SAVED to staging cloud records. Receipt: "+receipt);
+      const saleId=typeof data==="string"?data:typeof data==="object"?data?.sale_id??data?.id??null:null;
+      let receipt=typeof data==="object"&&data?.sale_no?String(data.sale_no):saleId??String(data);
+      let verified=false;
+      if(saleId){
+        try{
+          const result=await sb.from("sales").select("sale_no,total,status").eq("id",saleId).maybeSingle();
+          if(!result.error&&result.data){
+            verified=true;
+            receipt=result.data.sale_no||receipt;
+          }
+        }catch{ /* The RPC can succeed even if the subsequent read temporarily fails. */ }
+      }
+      setMessage((hold?"Sale held":"Sale completed")+" and SAVED to shared staging cloud records. Receipt: "+receipt+
+        (verified?" • Verified in central sales database.":" • If it does not appear in history, use Refresh Sales; do not repost without checking."));
       requestId.current=crypto.randomUUID();
       setApprovalPin("");
       if(!hold){setCart([]);setDiscountText("");setReceivedText("");setReference("");setCustomerId("");}
