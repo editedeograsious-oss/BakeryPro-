@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const ALLOWED_ROLES = new Set(["manager","cashier","baker","storekeeper"]);
+const ALLOWED_ROLES = new Set(["manager","cashier","baker","storekeeper","viewer"]);
 
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -95,7 +95,7 @@ Deno.serve(async (req: Request) => {
     role,
     active: true,
     branch_id: branch?.id ?? null,
-    require_password_reset: false,
+    require_password_reset: true,
   });
 
   if (profileError) {
