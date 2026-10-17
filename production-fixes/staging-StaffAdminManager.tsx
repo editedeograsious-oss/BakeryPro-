@@ -82,7 +82,7 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
       if(!res.ok)throw new Error(body?.error??"Could not invite staff member.");
       setMessage("Invitation created. The staff member must complete the email invite before login.");
       setEmail("");setName("");setRole("cashier");router.refresh();
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not invite staff member.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not invite staff member.");}
     finally{setBusy(false);}
   }
 
@@ -98,7 +98,7 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
       if(error)throw error;
       setMessage(row.active?"Staff account disabled.":"Staff account re-enabled.");
       router.refresh();
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not change staff status.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not change staff status.");}
     finally{setBusy(false);}
   }
 
@@ -112,7 +112,7 @@ export default function StaffAdminManager({staff,live}:{staff:any[];live:boolean
       if(error)throw error;
       setMessage("Staff role changed.");
       router.refresh();
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not change role.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not change role.");}
     finally{setBusy(false);}
   }
 
