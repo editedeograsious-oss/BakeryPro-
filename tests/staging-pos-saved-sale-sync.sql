@@ -5,6 +5,8 @@ END $guard$;
 SELECT set_config('test.pos.owner',(SELECT id::text FROM public.profiles WHERE role='owner' AND active AND disabled_at IS NULL LIMIT 1),true);
 SELECT set_config('request.jwt.claim.sub',current_setting('test.pos.owner'),true);
 SET LOCAL ROLE authenticated;
+SELECT set_config('test.pos.baseline_sales',(SELECT sales::text FROM public.owner_dashboard_summary('day')),true);
+SELECT set_config('test.pos.baseline_count',(SELECT transaction_count::text FROM public.owner_dashboard_summary('day')),true);
 SELECT set_config('test.pos.product',public.save_product(NULL::uuid,'ROLLBACK POS E2E Bread',NULL::uuid,7500,'Temporary POS integration fixture')::text,true);
 RESET ROLE;
 WITH x AS(
@@ -39,9 +41,9 @@ DO $verify$ BEGIN
  RAISE EXCEPTION 'POS stock not deducted'; END IF;
  IF (SELECT count(*) FROM public.sale_items WHERE sale_id=current_setting('test.pos.sale')::uuid)<>1 THEN
  RAISE EXCEPTION 'Sale items missing'; END IF;
- IF (SELECT sales FROM public.owner_dashboard_summary('day'))<>15000 THEN
+ IF (SELECT sales FROM public.owner_dashboard_summary('day'))<>current_setting('test.pos.baseline_sales')::numeric+15000 THEN
  RAISE EXCEPTION 'Owner dashboard failed to show the completed POS sale'; END IF;
- IF (SELECT transaction_count FROM public.owner_dashboard_summary('day'))<>1 THEN
+ IF (SELECT transaction_count FROM public.owner_dashboard_summary('day'))<>current_setting('test.pos.baseline_count')::bigint+1 THEN
  RAISE EXCEPTION 'Owner dashboard daily transaction count is incorrect'; END IF;
 END $verify$;
 DO $replay$ DECLARE second_sale uuid;BEGIN
