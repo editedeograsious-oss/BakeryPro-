@@ -93,10 +93,15 @@ export default function PosTerminal({products,openShift,customers,live,canPost=t
     const handler=()=>{if(active&&document.visibilityState==="visible"){void refreshSales();void refreshStock();}};
     const interval=window.setInterval(handler,15000);
     document.addEventListener("visibilitychange",handler);
+    const handleSharedChange=(event:Event)=>{
+      const module=String((event as CustomEvent<{module?:string}>).detail?.module??"");
+      if(["inventory","catalog","sales","orders","production"].includes(module))handler();
+    };
+    window.addEventListener("ds-bakery:shared-change",handleSharedChange);
     const channel=supabase.channel("bakery-pos-sales")
       .on("postgres_changes",{event:"*",schema:"public",table:"sales"},()=>{if(active)void refreshSales();})
       .subscribe();
-    return()=>{active=false;window.clearInterval(interval);document.removeEventListener("visibilitychange",handler);void supabase.removeChannel(channel);};
+    return()=>{active=false;window.clearInterval(interval);document.removeEventListener("visibilitychange",handler);window.removeEventListener("ds-bakery:shared-change",handleSharedChange);void supabase.removeChannel(channel);};
   },[live]);
 
   async function submit(hold:boolean){
