@@ -51,7 +51,7 @@ export default function PurchaseReceivingPanel({lines,history=[],live,operations
       delete requests.current[line.id];
       setQuantities(prev=>({...prev,[line.id]:0}));
       router.refresh();
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not receive stock.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not receive stock.");}
     finally{setBusy(false);}
   }
 
