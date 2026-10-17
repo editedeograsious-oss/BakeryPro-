@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 export default function AccessDenied() {
@@ -22,9 +24,13 @@ export default function AccessDenied() {
   return <main className="auth-wrap">
     <section className="auth-card" style={{maxWidth:520}}>
       <h1 style={{fontFamily:"Georgia,serif",color:"var(--brown)"}}>Account access needs attention</h1>
-      <p>Your session is connected, but this page could not verify your DS Bakery staff access.</p>
-      <p>Use the CEO/Owner account for Stock Management. If you are using a different staff account, only the pages authorized for your role will open.</p>
-      <p>Switch accounts to sign in again. If this keeps happening using your CEO account, the bakery administrator should check the Supabase staff profile and permissions.</p>
+      <p>{denied==="permission"
+        ?"Your login succeeded, but your staff role does not permit the page you attempted to open."
+        :denied==="role"?"Your account cannot open this staff-only page."
+        :"Your session is connected, but an active DS Bakery staff profile could not be verified."}</p>
+      <p>CEO/Owner, Sales Team, Bakers and Stock Managers have different workspaces. You do not need the CEO password to use your assigned role.</p>
+      <p>You can go to My Account and use the sidebar for pages your role is allowed to open. If your assigned role appears incorrect, ask the CEO to review Staff & Roles.</p>
+      <Link href="/my-account" className="btn secondary" style={{display:"block",textAlign:"center",marginBottom:12}}>Open my account and staff menu</Link>
       <button className="btn primary" type="button" onClick={switchAccount} disabled={busy} style={{width:"100%"}}>
         {busy ? "Signing out…" : "Sign out and use another account"}
       </button>
