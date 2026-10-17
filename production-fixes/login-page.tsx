@@ -6,7 +6,9 @@ import { createClient } from "@/lib/supabase/client";
 
 function signInError(error: { code?: string; status?: number; name?: string }) {
   if (error.code === "invalid_credentials") {
-    return "The sign-in service did not accept these credentials. Use your DS Bakery staff email and password.";
+    return process.env.NEXT_PUBLIC_DEPLOYMENT_ENV === "staging"
+      ? "These credentials are not recognized by the STAGING login. Staging accounts are separate from Production. Ask the CEO to create this email under Staging → Staff & Roles, or reset the Staging password."
+      : "The sign-in service did not accept these credentials. Use your DS Bakery staff email and password.";
   }
   if (error.code === "email_not_confirmed") {
     return "Confirm your staff email before signing in. Open the confirmation email sent to your inbox.";
@@ -111,6 +113,7 @@ export default function Login() {
   return <div className="auth-wrap">
     <form ref={formRef} className="auth-card" onSubmit={submit}>
       <div className="brand" style={{ marginBottom: 22 }}><img src="/ds-bakery-logo.svg" alt="DS Bakery" /><div><strong>DS Bakery</strong><small>Secure Staff Login</small></div></div>
+      {process.env.NEXT_PUBLIC_DEPLOYMENT_ENV === "staging" && <p role="note" style={{margin:"0 0 18px",padding:10,border:"1px solid #d2a24a",borderRadius:8,fontSize:13}}><strong>STAGING TEST LOGIN.</strong> Staff accounts here are separate from Production. The CEO must create the staff email in this environment before it can sign in.</p>}
       <div className="field"><label htmlFor="staff-email">Email</label><input id="staff-email" name="email" type="email" autoComplete="username" required={liveMode} /></div>
       <div className="field"><label htmlFor="staff-password">Password</label><input id="staff-password" name="password" type="password" autoComplete="current-password" required={liveMode} /></div>
       {!liveMode && <div className="field"><label>Preview role</label><select value={role} onChange={event => setRole(event.target.value)}><option value="owner">CEO / Owner</option><option value="manager">General Manager</option><option value="cashier">Sales Team</option><option value="baker">Head Baker</option><option value="storekeeper">Stock Manager</option></select></div>}
