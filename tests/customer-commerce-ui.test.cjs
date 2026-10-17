@@ -4,6 +4,10 @@ async function main(){
   const product={id:"a0000000-0000-4000-8000-000000000001",name:"Audit Bread",status:"active",selling_price:7500,image_url:null,online_available:false};
   const uploads=[],calls=[];
   const client={
+    auth:{
+      getUser:async()=>({data:{user:{id:"signed-in-test",email:"customer@example.test",email_confirmed_at:"2026-10-17T00:00:00Z"}},error:null}),
+      onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})
+    },
     storage:{from(bucket){return {upload:async(path,file,options)=>{uploads.push({bucket,path,file,options});return {data:{path},error:null};}};}},
     rpc:async(name,args)=>{calls.push({name,args});return {data:{order_no:"STAGE-ORDER-123",total:15000},error:null};}
   };
@@ -31,6 +35,9 @@ async function main(){
 
   const shopProduct={id:product.id,name:product.name,description:"Bakery bread",selling_price:7500,image_url:"https://example.test/photo.jpg",category_name:"Bread"};
   const shop=harness("BakeryShop.tsx",{products:[shopProduct],site:{business_name:"DS Bakery",delivery_enabled:true},orderingAllowed:true},client);
+  shop.render();
+  await shop.effects();
+
   const findInput=id=>find(shop.render(),x=>(x.type==="input"||x.type==="textarea"||x.type==="select")&&x.props.id===id)[0];
   const add=find(shop.render(),x=>x.type==="button"&&x.props["aria-label"]==="Add one Audit Bread")[0];
   add.props.onClick();
