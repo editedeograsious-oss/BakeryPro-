@@ -30,7 +30,7 @@ export default function CustomerAccount(){
     }
     setLoading(false);
   }
-  useEffect(()=>{void load();const sb=createClient();const {data:{subscription}}=sb.auth.onAuthStateChange(()=>{void load();});return()=>subscription.unsubscribe();},[]);
+  useEffect(()=>{void load();const sb=createClient();const {data:{subscription}}=sb.auth.onAuthStateChange(()=>{window.setTimeout(()=>{void load();},0);});return()=>subscription.unsubscribe();},[]);
 
   async function submit(){
     const addr=email.trim().toLowerCase();
@@ -55,7 +55,7 @@ export default function CustomerAccount(){
         setPassword("");
         setMessage("Check your email for an account confirmation link before ordering. If your email is already registered, sign in instead.");
       }else{
-        const {error}=await sb.auth.resetPasswordForEmail(addr,{redirectTo:window.location.origin+"/auth/callback"});
+        const {error}=await sb.auth.resetPasswordForEmail(addr,{redirectTo:window.location.origin+"/shop/auth/callback"});
         if(error)throw error;
         setMessage("If this account exists, a password reset email will arrive shortly.");
       }
@@ -78,6 +78,16 @@ export default function CustomerAccount(){
         <p>{current.verified?"Email verified — ordering is available when the bakery is open.":"Please verify your email to place orders."}</p>
         <div className="action-row"><Link className="btn primary" href="/shop">Continue shopping</Link>
           <button className="btn secondary" disabled={busy} onClick={signOut}>Sign out</button></div>
+        <div style={{marginTop:18,borderTop:"1px solid #ddd",paddingTop:12}}>
+          <h3>Change my password</h3><p>After using a password reset link, set a new password here.</p>
+          <div className="field"><label htmlFor="change-customer-password">New password (12+ characters)</label>
+          <input id="change-customer-password" type="password" autoComplete="new-password" value={password} onChange={e=>setPassword(e.target.value)}/></div>
+          <button className="btn secondary" disabled={busy||password.length<12} onClick={async()=>{
+            setBusy(true);
+            const {error}=await createClient().auth.updateUser({password});
+            setBusy(false);setMessage(error?error.message:"Password updated successfully.");if(!error)setPassword("");
+          }}>Save new password</button>
+        </div>
       </section>
       {current.verified&&<section className="card" style={{padding:20,marginTop:14}}>
         <h2>My bakery orders</h2><p>Your orders are tied to your verified account, not merely to a phone number.</p>
