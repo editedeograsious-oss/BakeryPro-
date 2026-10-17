@@ -22,10 +22,17 @@ export async function getCurrentStaff() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   const { data: profile, error } = await supabase.from("profiles")
-    .select("id,full_name,role,active,session_version,disabled_at,require_password_reset")
+    .select("id,full_name,role,active,session_version,disabled_at,require_password_reset,first_login_completed_at")
     .eq("id", user.id).single();
   if (error || !profile || !profile.active || profile.disabled_at) return null;
   if (profile.require_password_reset && profile.role !== "owner") redirect("/first-login");
+  // A JWT created before a mandatory password replacement must never acquire
+  // operational permissions after the staff profile is activated. The database
+  // also enforces this on every RLS/RPC business request.
+  if (profile.first_login_completed_at) {
+    const {data:isFresh,error:sessionError}=await supabase.rpc("ds_staff_session_is_fresh");
+    if (sessionError || isFresh !== true) redirect("/access-denied?reason=session-expired");
+  }
   return { demo: false, user, profile };
 }
 
