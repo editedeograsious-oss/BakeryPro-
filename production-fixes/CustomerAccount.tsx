@@ -59,7 +59,7 @@ export default function CustomerAccount(){
         if(error)throw error;
         setMessage("If this account exists, a password reset email will arrive shortly.");
       }
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not complete authentication.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not complete authentication.");}
     finally{setBusy(false);}
   }
 
