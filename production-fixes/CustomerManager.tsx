@@ -55,7 +55,7 @@ export default function CustomerManager({customers,live,canPrepareOpening=false,
       setMessage("Customer saved.");
       clear();
       router.refresh();
-    }catch(e){setMessage(e instanceof Error?e.message:"Could not save customer.");}
+    }catch(e){setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not save customer.");}
     finally{setBusy(false);}
   }
 
