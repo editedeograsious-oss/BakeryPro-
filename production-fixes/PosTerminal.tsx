@@ -10,6 +10,18 @@ type PaymentMethod="cash"|"mtn_momo"|"airtel_money"|"customer_credit";
 type Sale={id:string;sale_no:string|null;total:number|string;created_at:string;status:string;held:boolean;cashier_id:string|null};
 function sanitizeAmount(raw:string){let value=raw.replace(/[^0-9.]/g,"");let [whole,...frac]=value.split(".");whole=whole.replace(/^0+(?=\d)/,"");if(value.startsWith("."))whole="0";return frac.length?whole+"."+frac.join("").slice(0,2):whole;}
 function amount(raw:string){const n=Number(raw);return Number.isFinite(n)&&n>=0?n:0;}
+function describeSaleError(error:unknown):string {
+  const obj=(error && typeof error==="object"?error:null) as {message?:unknown;details?:unknown;hint?:unknown;code?:unknown}|null;
+  const message=typeof obj?.message==="string"?obj.message:(error instanceof Error?error.message:typeof error==="string"?error:"Unable to reach the shared sales database.");
+  const details=typeof obj?.details==="string" && obj.details!==message ? obj.details : "";
+  const hint=typeof obj?.hint==="string" ? obj.hint : "";
+  if(/insufficient finished-goods stock/i.test(message)){
+    return "Not enough finished goods have been recorded. Confirm production and stock batches before selling. "+message;
+  }
+  if(/open cashier shift required/i.test(message))return "Open your cashier shift before saving a sale.";
+  if(/invalid refresh token|jwt expired|invalid jwt/i.test(message))return "Your login has expired. Please sign out and sign in again before posting a sale.";
+  return [message,details,hint].filter(Boolean).join(" — ");
+}
 function MoneyInput({value,onChange,label,kind="money"}:{value:string;onChange:(value:string)=>void;label:string;kind?:"money"|"percent"}){
   return <div className="field"><label>{label}</label><input type="text" inputMode="decimal" autoComplete="off"
     aria-label={label} placeholder={kind==="money"?"Enter amount in UGX":"Enter percentage"}
@@ -28,6 +40,8 @@ export default function PosTerminal({products,openShift,customers,live,canPost=t
   const [customerId,setCustomerId]=useState("");
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
+  const [stock,setStock]=useState<Record<string,number>>(()=>Object.fromEntries(products.map((p:any)=>[String(p.id),Number(p.available_qty??0)])));
+  const [stockStatus,setStockStatus]=useState("");
   const [sales,setSales]=useState<Sale[]>([]);
   const [historyStatus,setHistoryStatus]=useState("");
   const [syncAt,setSyncAt]=useState("");
@@ -38,8 +52,26 @@ export default function PosTerminal({products,openShift,customers,live,canPost=t
   const received=amount(receivedText);
   const change=paymentMethod==="cash"?changeDue(received,total):0;
   const selectedCustomer=customers.find((c:any)=>(c.id??c.customer_id)===customerId);
-  function addProduct(p:any){setCart(prev=>{const current=prev.find(x=>x.productId===p.id);return current?prev.map(x=>x.productId===p.id?{...x,quantity:x.quantity+1}:x):[...prev,{productId:p.id,name:p.name,unitPrice:Number(p.selling_price),quantity:1}];});}
-  function updateQty(id:string,delta:number){setCart(prev=>prev.map(x=>x.productId===id?{...x,quantity:Math.max(0,x.quantity+delta)}:x).filter(x=>x.quantity>0));}
+  function addProduct(p:any){
+    const available=stock[p.id]??0;
+    const current=cart.find(x=>x.productId===p.id)?.quantity??0;
+    if(current>=available){setMessage("Cannot add "+p.name+": "+available+" unit(s) recorded as sellable finished goods. Record a completed production batch first.");return;}
+    setCart(prev=>{const found=prev.find(x=>x.productId===p.id);return found?prev.map(x=>x.productId===p.id?{...x,quantity:x.quantity+1}:x):[...prev,{productId:p.id,name:p.name,unitPrice:Number(p.selling_price),quantity:1}];});
+    setMessage("");
+  }
+  function updateQty(id:string,delta:number){
+    const item=cart.find(x=>x.productId===id);
+    if(delta>0&&item&&item.quantity>=Number(stock[id]??0)){setMessage("Cannot increase "+item.name+" above available finished stock ("+Number(stock[id]??0)+").");return;}
+    setCart(prev=>prev.map(x=>x.productId===id?{...x,quantity:Math.max(0,x.quantity+delta)}:x).filter(x=>x.quantity>0));
+  }
+  async function refreshStock(){
+    if(!live)return;
+    const {data,error}=await createClient().rpc("pos_available_finished_stock");
+    if(error){setStockStatus("Could not refresh stock: "+error.message);return;}
+    if(!Array.isArray(data)){setStockStatus("Stock check returned an unexpected result.");return;}
+    setStock(Object.fromEntries(data.map((r:any)=>[String(r.product_id),Number(r.available_quantity??0)])));
+    setStockStatus("");
+  }
 
   async function refreshSales(){
     if(!live)return;
@@ -57,7 +89,8 @@ export default function PosTerminal({products,openShift,customers,live,canPost=t
     const supabase=createClient();
     let active=true;
     void refreshSales();
-    const handler=()=>{if(active&&document.visibilityState==="visible")void refreshSales();};
+    void refreshStock();
+    const handler=()=>{if(active&&document.visibilityState==="visible"){void refreshSales();void refreshStock();}};
     const interval=window.setInterval(handler,15000);
     document.addEventListener("visibilitychange",handler);
     const channel=supabase.channel("bakery-pos-sales")
@@ -70,6 +103,11 @@ export default function PosTerminal({products,openShift,customers,live,canPost=t
     if(busy)return;
     if(!cart.length){setMessage("Add at least one product.");return;}
     if(!openShift){setMessage("Open your cashier shift before posting sales.");return;}
+    const insufficient=cart.find(line=>line.quantity>Number(stock[line.productId]??0));
+    if(insufficient){
+      setMessage("SALE NOT SAVED: "+insufficient.name+" needs "+insufficient.quantity+" unit(s) but only "+Number(stock[insufficient.productId]??0)+" is recorded as finished stock. Confirm production at Finished Goods before posting.");
+      return;
+    }
     if(!hold && paymentMethod==="cash"&&received<total){setMessage("Cash received is less than the total.");return;}
     if(!hold && ["mtn_momo","airtel_money"].includes(paymentMethod)&&!reference.trim()){setMessage("Enter the Mobile Money transaction reference.");return;}
     if(!hold&&paymentMethod==="customer_credit"&&!customerId){setMessage("Select a customer for a credit sale.");return;}
@@ -106,9 +144,9 @@ export default function PosTerminal({products,openShift,customers,live,canPost=t
       requestId.current=crypto.randomUUID();
       setApprovalPin("");
       if(!hold){setCart([]);setDiscountText("");setReceivedText("");setReference("");setCustomerId("");}
-      await refreshSales();router.refresh();
+      await refreshSales();await refreshStock();router.refresh();
     }catch(error){
-      setMessage("SALE NOT SAVED: "+(error instanceof Error?error.message:"Check the connection, business lock, stock, permissions and cashier shift."));
+      setMessage("SALE NOT SAVED: "+describeSaleError(error));
     }finally{setBusy(false);}
   }
 
@@ -122,10 +160,25 @@ export default function PosTerminal({products,openShift,customers,live,canPost=t
     {message&&<div className="hero" role="status" style={{padding:14,marginBottom:14}}><b>{message}</b></div>}
     {!openShift&&<div className="hero"><strong>Cashier shift required.</strong> <a href="/shifts">Open your shift before selling</a>.</div>}
     <div className="grid2">
-      <section className="card"><h3>Products</h3><div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
-        {products.map(p=><button type="button" key={p.id} className="btn secondary" onClick={()=>addProduct(p)} style={{minHeight:83,textAlign:"left"}}>
-          <strong>{p.name}</strong><div>{p.category_name}</div><small>{ugx(Number(p.selling_price))}</small></button>)}
-      </div></section>
+      <section className="card">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:8}}>
+          <h3>Products</h3><button type="button" className="btn secondary" onClick={()=>void refreshStock()}>Refresh Stock</button>
+        </div>
+        <p style={{fontSize:12}}>Only finished bakery goods recorded through Production can be sold. <a href="/finished-goods">View finished goods</a>.</p>
+        {stockStatus&&<p role="alert">{stockStatus}</p>}
+        <div style={{display:"grid",gridTemplateColumns:"repeat(2,minmax(0,1fr))",gap:10}}>
+        {products.map(p=><button type="button" key={p.id} className="btn secondary" onClick={()=>addProduct(p)}
+          disabled={Number(stock[p.id]??0)<=0}
+          title={Number(stock[p.id]??0)<=0?"No recorded finished stock. Complete production before selling.":undefined}
+          style={{minHeight:83,textAlign:"left"}}>
+          <strong>{p.name}</strong><div>{p.category_name}</div>
+          <small>{ugx(Number(p.selling_price))}</small>
+          <div style={{marginTop:4,fontSize:12,fontWeight:700,color:Number(stock[p.id]??0)>0?"#21754b":"#aa3e2d"}}>
+            {Number(stock[p.id]??0)>0?"Available: "+Number(stock[p.id]).toLocaleString()+" unit(s)":"Out of stock — record production"}
+          </div>
+        </button>)}
+        </div>
+      </section>
       <section className="card"><h3>Current Sale</h3>
       {cart.length===0?<p>Tap a product to begin.</p>:<div className="tablewrap"><table><thead><tr><th>Product</th><th>Qty</th><th>Total</th></tr></thead>
       <tbody>{cart.map(line=><tr key={line.productId}><td>{line.name}<small style={{display:"block"}}>{ugx(line.unitPrice)} each</small></td>
