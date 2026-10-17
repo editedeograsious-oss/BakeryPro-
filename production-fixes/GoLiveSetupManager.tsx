@@ -51,7 +51,7 @@ export default function GoLiveSetupManager({readiness,live}:{readiness:any;live:
       setMessage("Go-live checklist saved. Any previous completion was cleared for re-verification.");
       router.refresh();
     }catch(e){
-      setMessage(e instanceof Error?e.message:"Could not save go-live checklist.");
+      setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not save go-live checklist.");
     }finally{
       setBusy(false);
     }
@@ -73,7 +73,7 @@ export default function GoLiveSetupManager({readiness,live}:{readiness:any;live:
       setConfirmation("");
       router.refresh();
     }catch(e){
-      setMessage(e instanceof Error?e.message:"Could not complete go-live setup.");
+      setMessage(e&&typeof e==="object"&&"message" in e?String(e.message):"Could not complete go-live setup.");
     }finally{
       setBusy(false);
     }
