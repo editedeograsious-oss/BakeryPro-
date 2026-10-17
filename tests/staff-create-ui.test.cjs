@@ -8,7 +8,7 @@ async function main(){
     posts.push({path,body:JSON.parse(init.body),headers:init.headers});
     return respond(path,init);
   };
-  const client={auth:{getSession:async()=>({data:{session:{access_token:"test-bearer"}},error:null})}};
+  const client={auth:{getSession:async()=>({data:{session:{access_token:"test-bearer"}},error:null})},from:(table)=>{assert.equal(table,"profiles");return {select:()=>({eq:()=>({maybeSingle:async()=>({data:{id:"test-staff",role:"cashier",active:true},error:null})})})};}};
   const ui=harness("staging-StaffAdminManager.tsx",{staff:[],live:true},client);
   function inputs(){return find(ui.render(),n=>n.type==="input");}
   function enter(fields){
@@ -37,6 +37,7 @@ async function main(){
   assert(posts[0].headers.authorization.startsWith("Bearer "),"Logged-in authorization attached");
   assert(!text(ui.render()).includes("LongDemoPass!2026"),"Password does not appear in page");
   assert(pw().every(i=>i.props.value===""),"Passwords cleared after success");
+  assert(text(ui.render()).includes("STAGING staff account verified"),"Do not report success before verified profile exists");
 
   enter([[i=>i.props.type===undefined,"Test Cashier"],[i=>i.props.type==="email","cashier-test@example.test"]]);
   pw()[0].props.onChange({target:{value:"AnotherLongPass!2026"}});
