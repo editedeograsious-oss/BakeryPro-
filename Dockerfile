@@ -59,6 +59,9 @@ RUN unzip -q /tmp/ds-bakery.zip -d /app \
   && cp /tmp/production-fixes/OwnerCommerce.tsx /app/site/components/commerce/OwnerCommerce.tsx \
   && cp /tmp/production-fixes/shop-page.tsx /app/site/app/shop/page.tsx \
   && cp /tmp/production-fixes/owner-commerce-page.tsx /app/site/app/owner-commerce/page.tsx \
+  && mkdir -p /app/site/components/notifications /app/site/app/notifications \
+  && cp /tmp/production-fixes/NotificationCenter.tsx /app/site/components/notifications/NotificationCenter.tsx \
+  && cp /tmp/production-fixes/notifications-page.tsx /app/site/app/notifications/page.tsx \
   && mkdir -p /app/site/app/stock-management \
   && cp /tmp/production-fixes/StockManagement.tsx /app/site/components/operations/StockManagement.tsx \
   && cp /tmp/production-fixes/stock-management-page.tsx /app/site/app/stock-management/page.tsx \
