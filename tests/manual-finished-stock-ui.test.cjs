@@ -1,0 +1,36 @@
+const assert=require("node:assert/strict");
+const fs=require("node:fs");
+const path=require("node:path");
+const {harness,find,button,text}=require("./ui-harness.cjs");
+async function main(){
+  const batchId="bbbbbbbb-2222-4333-8444-555555555555";
+  const calls=[];
+  const client={rpc:async(name,args)=>{calls.push({name,args});return {data:batchId,error:null};}};
+  const products=[{id:"aaaaaaaa-1111-4111-8111-222222222222",name:"Bread",status:"active",selling_price:5000}];
+  const screen=harness("FinishedStockIn.tsx",{products},client);
+  const input=(id)=>find(screen.render(),e=>e.props?.id===id)[0];
+  assert.equal(input("manual-stock-qty").props.value,"","Quantity does not start with zero");
+  assert.equal(input("manual-stock-cost").props.value,"","Cost does not start with zero");
+  await button(screen.render(),"Save Finished Stock").props.onClick();
+  assert.equal(calls.length,0,"Incomplete details cannot be posted");
+  input("manual-stock-qty").props.onChange({target:{value:"20"}});
+  input("manual-stock-cost").props.onChange({target:{value:"2000"}});
+  input("manual-stock-reason").props.onChange({target:{value:"Opening physical stock counted at the shop"}});
+  await button(screen.render(),"Save Finished Stock").props.onClick();
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].name,"owner_add_finished_stock");
+  assert.equal(calls[0].args.p_quantity,20);
+  assert.equal(calls[0].args.p_unit_cost,2000);
+  assert.equal(calls[0].args.p_product_id,products[0].id);
+  assert(calls[0].args.p_client_request_id,"Request ID must be stable until success");
+  assert(text(screen.render()).includes("Stock saved."));
+  assert.equal(input("manual-stock-qty").props.value,"");
+  assert.equal(input("manual-stock-cost").props.value,"");
+  assert(screen.refreshes>0,"Stock listing is refreshed after save");
+  const src=fs.readFileSync(path.resolve(__dirname,"../production-fixes/finished-goods-page.tsx"),"utf8");
+  assert(src.includes('from("finished_goods_batches")'),"Page uses staging base table");
+  assert(!src.includes("finished_goods_batch_summary"),"Page must not depend on missing summary view");
+  assert(src.includes("staff.profile.role==="+'"owner"'),"Stock form rendered for CEO only");
+  console.log("PASS: CEO manual stock form, blank amount fields, posting, and missing-view crash guard.");
+}
+main().catch(err=>{console.error(err);process.exitCode=1;});
