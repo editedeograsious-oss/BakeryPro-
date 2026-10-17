@@ -52,7 +52,7 @@ export default function OwnerCommerce({products,reviews}:{products:Item[];review
     <td>UGX {Number(p.selling_price).toLocaleString()}</td>
     <td><span className={p.online_available?"badge green":"badge gold"}>{p.online_available?"Available online":"Hidden"}</span></td>
     <td><input aria-label={`Photo for ${p.name}`} type="file" accept="image/jpeg,image/png,image/webp" disabled={busy!==null} onChange={e=>setFiles(s=>({...s,[p.id]:e.target.files?.[0]}))}/><small>JPEG, PNG or WebP; max 5 MB</small></td>
-    <td><div className="action-row"><button className="btn secondary" disabled={busy!==null||!files[p.id]} onClick={()=>upload(p)}>Upload Photo</button><button className="btn primary" disabled={busy!==null||p.status!=="active"} onClick={()=>publish(p)}>{p.online_available?"Unpublish":"Publish"}</button></div></td>
+    <td><div className="action-row"><button className="btn secondary" disabled={busy!==null||!files[p.id]} onClick={()=>upload(p)}>Upload Photo</button><button className="btn primary" disabled={busy!==null||p.status!=="active"||(!p.online_available&&!p.image_url)} onClick={()=>publish(p)} title={!p.image_url&&!p.online_available?"Upload a photo before publishing":undefined}>{p.online_available?"Unpublish":"Publish"}</button></div></td>
    </tr>)}
   </tbody></table></div>
   <h2 style={{marginTop:26}}>Customer Review Moderation</h2><p>Reviews are hidden until approved. Only customers with completed orders can submit them.</p>
