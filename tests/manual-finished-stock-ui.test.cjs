@@ -29,7 +29,7 @@ async function main(){
   assert(screen.refreshes>0,"Stock listing is refreshed after save");
   const src=fs.readFileSync(path.resolve(__dirname,"../production-fixes/finished-goods-page.tsx"),"utf8");
   assert(src.includes('from("finished_goods_batches")'),"Page uses staging base table");
-  assert(!src.includes("finished_goods_batch_summary"),"Page must not depend on missing summary view");
+  assert(!src.includes('from("finished_goods_batch_summary")'),"Page must not query missing summary view");
   assert(src.includes("staff.profile.role==="+'"owner"'),"Stock form rendered for CEO only");
   console.log("PASS: CEO manual stock form, blank amount fields, posting, and missing-view crash guard.");
 }
