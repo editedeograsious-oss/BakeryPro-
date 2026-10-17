@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 type Product={id:string;name:string;description:string|null;selling_price:number|string;image_url:string|null;category_name:string|null};
 type Review={rating:number;display_name:string;review_text:string;created_at:string};
@@ -7,6 +7,25 @@ type Site={business_name?:string;tagline?:string;phone?:string;opening_hours?:st
 const money=(n:number)=>"UGX "+Math.round(n).toLocaleString("en-US");
 const err=(e:unknown)=>e instanceof Error?e.message:"The request could not be completed.";
 export default function BakeryShop({products,site,orderingAllowed}:{products:Product[];site:Site;orderingAllowed:boolean}){
+ const [customer,setCustomer]=useState<{id:string;email:string;verified:boolean}|null>(null);
+ const [authLoaded,setAuthLoaded]=useState(false);
+ useEffect(()=>{
+   let active=true;
+   const client=createClient();
+   async function check(){
+     const {data:{user}}=await client.auth.getUser();
+     if(!active)return;
+     const next=user?{id:user.id,email:user.email||"",verified:Boolean(user.email_confirmed_at)}:null;
+     setCustomer(next);
+     setAuthLoaded(true);
+     if(next?.verified)setEmail(next.email);
+   }
+   void check();
+   const {data:{subscription}}=client.auth.onAuthStateChange(()=>{
+     window.setTimeout(()=>{if(active)void check();},0);
+   });
+   return()=>{active=false;subscription.unsubscribe();};
+ },[]);
  const [quantities,setQuantities]=useState<Record<string,number>>({});
  const [name,setName]=useState(""),[phone,setPhone]=useState(""),[email,setEmail]=useState("");
  const [fulfillment,setFulfillment]=useState<"pickup"|"delivery">("pickup");
@@ -22,6 +41,7 @@ export default function BakeryShop({products,site,orderingAllowed}:{products:Pro
  function changeQty(id:string,n:number){setQuantities(old=>({...old,[id]:Math.max(0,Math.min(100,Math.trunc(n)||0))}));setNotice("");}
  async function order(){
   if(busy||!orderingAllowed)return;
+  if(!customer?.verified){setNotice("Sign in and verify your email before sending a customer order.");return;}
   if(!items.length){setNotice("Add at least one product.");return;}
   if(!name.trim()||!phone.trim()||!neededAt){setNotice("Enter your name, phone and requested date/time.");return;}
   if(fulfillment==="delivery"&&!address.trim()){setNotice("Enter your delivery address.");return;}
@@ -64,6 +84,10 @@ export default function BakeryShop({products,site,orderingAllowed}:{products:Pro
    <div>{site.phone&&<a href={`tel:${site.phone}`}>Call {site.phone}</a>}{site.address_text&&<p>{site.address_text}</p>}</div>
   </header>
   {!orderingAllowed&&<div className="hero" role="status" style={{padding:16}}><strong>Online checkout is not open yet.</strong> Browse our products while the bakery prepares for launch.</div>}
+  <div className="hero" style={{padding:14,marginTop:12,marginBottom:16}} role="status">
+   {authLoaded?(customer?.verified?<span>Signed in as <strong>{customer.email}</strong>. <a href="/shop/account">View my orders or sign out</a>.</span>
+    :<span>Browse products freely. <a href="/shop/account"><strong>Sign in or create a verified customer account</strong></a> before placing an order.</span>):"Checking customer login…"}
+  </div>
   <h2>Our bakery products</h2><p>Prices are in Ugandan shillings. Staff confirm each order before fulfillment.</p>
   <section style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:18,margin:"20px 0 32px"}}>
    {products.length===0?<p>No products have been published yet.</p>:products.map(p=><article key={p.id} className="card" style={{padding:14}}>
@@ -84,13 +108,14 @@ export default function BakeryShop({products,site,orderingAllowed}:{products:Pro
    <div className="grid2">
     <div className="field"><label htmlFor="shop-name">Your name</label><input id="shop-name" maxLength={120} autoComplete="name" value={name} onChange={e=>setName(e.target.value)}/></div>
     <div className="field"><label htmlFor="shop-phone">Phone</label><input id="shop-phone" maxLength={30} type="tel" autoComplete="tel" value={phone} onChange={e=>setPhone(e.target.value)}/></div>
-    <div className="field"><label htmlFor="shop-email">Email (optional)</label><input id="shop-email" maxLength={254} type="email" value={email} onChange={e=>setEmail(e.target.value)}/></div>
+    <div className="field"><label htmlFor="shop-email">Email (optional)</label><input id="shop-email" maxLength={254} type="email" readOnly={Boolean(customer?.verified)} value={email} onChange={e=>setEmail(e.target.value)}/></div>
     <div className="field"><label htmlFor="shop-time">Requested date and time</label><input id="shop-time" type="datetime-local" value={neededAt} onChange={e=>setNeededAt(e.target.value)}/></div>
     <div className="field"><label htmlFor="shop-fulfillment">Pickup or delivery</label><select id="shop-fulfillment" value={fulfillment} onChange={e=>setFulfillment(e.target.value as "pickup"|"delivery")}><option value="pickup">Pick up at bakery</option>{site.delivery_enabled&&<option value="delivery">Delivery</option>}</select></div>
     {fulfillment==="delivery"&&<div className="field"><label htmlFor="shop-address">Delivery address</label><input id="shop-address" maxLength={300} value={address} onChange={e=>setAddress(e.target.value)}/></div>}
    </div>
    <div className="field"><label htmlFor="shop-notes">Cake message, allergies or instructions (optional)</label><textarea id="shop-notes" maxLength={1000} value={notes} onChange={e=>setNotes(e.target.value)}/></div>
-   <button className="btn primary" disabled={!orderingAllowed||busy||!items.length} onClick={order}>{busy?"Submitting…":"Submit order request"}</button>
+   <button className="btn primary" disabled={!orderingAllowed||busy||!items.length||!customer?.verified} onClick={order}>{busy?"Submitting…":"Submit order request"}</button>
+   {!customer?.verified&&<p>To order, <a href="/shop/account">sign in or register</a> and verify your email.</p>}
    {notice&&<p role="status">{notice}</p>}
    {orderNumber&&<p><strong>Save your order number: {orderNumber}</strong></p>}
   </section>
