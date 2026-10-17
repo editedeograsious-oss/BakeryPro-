@@ -33,7 +33,8 @@ async function main(){
   const shop=harness("BakeryShop.tsx",{products:[shopProduct],site:{business_name:"DS Bakery",delivery_enabled:true},orderingAllowed:true},client);
   const findInput=id=>find(shop.render(),x=>(x.type==="input"||x.type==="textarea"||x.type==="select")&&x.props.id===id)[0];
   const add=find(shop.render(),x=>x.type==="button"&&x.props["aria-label"]==="Add one Audit Bread")[0];
-  add.props.onClick();add.props.onClick();
+  add.props.onClick();
+  find(shop.render(),x=>x.type==="button"&&x.props["aria-label"]==="Add one Audit Bread")[0].props.onClick();
   findInput("shop-name").props.onChange({target:{value:"Test Customer"}});
   findInput("shop-phone").props.onChange({target:{value:"07000000123"}});
   const nextDay=new Date(Date.now()+86400000).toISOString().slice(0,16);
