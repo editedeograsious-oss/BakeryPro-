@@ -57,7 +57,16 @@ async function pageMarkup(filename, launch, error = null, environment = 'product
     '@/lib/costing': { ugx: value => `UGX ${value}` },
     '@/lib/integration/health': { getSystemHealth: async () => ({ mode: 'live', environment, checks: [] }) },
     '@/lib/repositories/reports': { getOwnerDashboard: async () => ({ summary: [], bestSellers: [], lowStock: [], recentActivity: [] }) },
-    '@/lib/supabase/server': { createClient: async () => ({ rpc: async name => name === 'launch_readiness_summary' ? { data: launch, error } : { data: {}, error: null } }) }
+    '@/lib/supabase/server': { createClient: async () => ({
+      rpc: async name => name === 'launch_readiness_summary' ? { data: launch, error }
+        : name === 'owner_dashboard_summary' ? {data:[{sales:0,transaction_count:0}],error:null}
+        : { data: {}, error: null },
+      from: () => ({
+        select: () => ({
+          order: () => ({ limit: async () => ({data:[],error:null}) })
+        })
+      })
+    }) }
   }).default;
   return renderToStaticMarkup(await page());
 }
