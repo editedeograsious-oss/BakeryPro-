@@ -16,7 +16,7 @@ function MoneyInput({value,onChange,label,kind="money"}:{value:string;onChange:(
     value={value} onChange={e=>onChange(sanitizeAmount(e.target.value))}
     onFocus={e=>e.currentTarget.select()} /></div>;
 }
-export default function PosTerminal({products,openShift,customers,live}:{products:any[];openShift:any|null;customers:any[];live:boolean}){
+export default function PosTerminal({products,openShift,customers,live,canPost=true}:{products:any[];openShift:any|null;customers:any[];live:boolean;canPost?:boolean}){
   const router=useRouter();
   const [cart,setCart]=useState<CartLine[]>([]);
   const [discountType,setDiscountType]=useState<"amount"|"percent">("amount");
@@ -75,6 +75,7 @@ export default function PosTerminal({products,openShift,customers,live}:{product
     if(!hold&&paymentMethod==="customer_credit"&&!selectedCustomer?.credit_enabled){setMessage("Customer credit is not enabled.");return;}
     if(!hold&&paymentMethod==="customer_credit"&&Number(selectedCustomer?.available_credit??0)<total){setMessage("Not enough available customer credit.");return;}
     if(!live){setMessage("Demo mode: NO SALE SAVED to shared cloud records.");return;}
+    if(!canPost){setMessage("SALE NOT SAVED: live operations are locked. Ask the CEO to complete go-live validation.");return;}
     setBusy(true);setMessage("Saving the sale to shared records…");
     try{
       const sb=createClient();
@@ -99,9 +100,10 @@ export default function PosTerminal({products,openShift,customers,live}:{product
   return <div className="shell"><Sidebar/><main className="main">
     <div className="pagehead"><div><h1>Cashier POS</h1><p>Shared cloud sales with clear save confirmation and automatically refreshed records.</p></div>
       <div className="action-row"><span className={openShift?"badge green":"badge red"}>{openShift?"Shift Open":"No Open Shift"}</span>
-      <button className="btn secondary" disabled={busy} onClick={()=>submit(true)}>Hold Sale</button>
+      <button className="btn secondary" disabled={busy||!live||!canPost} onClick={()=>submit(true)}>Hold Sale</button>
       <button className="btn secondary" disabled={busy} onClick={()=>setCart([])}>Clear Cart</button></div></div>
     {!live&&<div className="hero"><strong>Demo mode:</strong> this screen cannot save actual shared sales.</div>}
+    {live&&!canPost&&<div className="hero" role="alert"><strong>Live sales are locked.</strong> Entries here cannot be posted until the CEO completes the protected go-live process. Saved sales will not appear in reports until posting succeeds.</div>}
     {message&&<div className="hero" role="status" style={{padding:14,marginBottom:14}}><b>{message}</b></div>}
     {!openShift&&<div className="hero"><strong>Cashier shift required.</strong> <a href="/shifts">Open your shift before selling</a>.</div>}
     <div className="grid2">
@@ -122,7 +124,7 @@ export default function PosTerminal({products,openShift,customers,live}:{product
       {paymentMethod==="cash"?<><MoneyInput label="Cash received" value={receivedText} onChange={setReceivedText}/><p>Change: <strong>{ugx(change)}</strong></p></>:
       paymentMethod==="customer_credit"?<p>Available credit: {ugx(Number(selectedCustomer?.available_credit??0))}</p>:
       <div className="field"><label>Transaction reference</label><input value={reference} onChange={e=>setReference(e.target.value)} /></div>}
-      <button className="btn primary" disabled={busy||!openShift||!cart.length||(!live)} onClick={()=>submit(false)} style={{width:"100%",marginTop:9}}>{busy?"Saving…":"Complete and Save Sale"}</button>
+      <button className="btn primary" disabled={busy||!openShift||!cart.length||!live||!canPost} onClick={()=>submit(false)} style={{width:"100%",marginTop:9}}>{busy?"Saving…":"Complete and Save Sale"}</button>
       </section>
     </div>
     <section className="card" style={{marginTop:16}}><div className="pagehead"><div><h2>Shared POS Sales History</h2><p>Saved cloud transactions visible to authorized staff. Customer web orders remain separate until processed.</p></div>
