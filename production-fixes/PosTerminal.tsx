@@ -24,6 +24,7 @@ export default function PosTerminal({products,openShift,customers,live,canPost=t
   const [paymentMethod,setPaymentMethod]=useState<PaymentMethod>("cash");
   const [receivedText,setReceivedText]=useState("");
   const [reference,setReference]=useState("");
+  const [approvalPin,setApprovalPin]=useState("");
   const [customerId,setCustomerId]=useState("");
   const [message,setMessage]=useState("");
   const [busy,setBusy]=useState(false);
@@ -81,15 +82,17 @@ export default function PosTerminal({products,openShift,customers,live,canPost=t
       const sb=createClient();
       const argumentsBase={p_items:cart.map(x=>({product_id:x.productId,quantity:x.quantity})),p_discount:disc,p_notes:null,p_client_request_id:requestId.current};
       const {data,error}=(!hold&&paymentMethod==="customer_credit")
-        ?await sb.rpc("complete_credit_sale",{...argumentsBase,p_customer_id:customerId})
-        :await sb.rpc("complete_sale_with_customer",{
-            ...argumentsBase,p_payments:hold?[]:[{method:paymentMethod,amount:total,reference:paymentMethod==="cash"?null:reference.trim()}],
-            p_hold:hold,p_customer_id:customerId||null
+        ?await sb.rpc("complete_credit_sale_controlled",{...argumentsBase,p_customer_id:customerId,p_approval_pin:approvalPin.trim()||null})
+        :await sb.rpc("complete_sale_v038",{
+            p_items:argumentsBase.p_items,p_manual_discount:disc,p_promo_code:null,p_notes:null,p_client_request_id:requestId.current,
+            p_payments:hold?[]:[{method:paymentMethod,amount:total,reference:paymentMethod==="cash"?null:reference.trim()}],
+            p_hold:hold,p_customer_id:customerId||null,p_approval_pin:approvalPin.trim()||null
           });
       if(error)throw error;
       const receipt=typeof data==="string"?data:typeof data==="object"?data?.sale_no??data?.sale_id??JSON.stringify(data):String(data);
       setMessage((hold?"Sale held":"Sale completed")+" and SAVED to staging cloud records. Receipt: "+receipt);
       requestId.current=crypto.randomUUID();
+      setApprovalPin("");
       if(!hold){setCart([]);setDiscountText("");setReceivedText("");setReference("");setCustomerId("");}
       await refreshSales();router.refresh();
     }catch(error){
@@ -124,6 +127,10 @@ export default function PosTerminal({products,openShift,customers,live,canPost=t
       {paymentMethod==="cash"?<><MoneyInput label="Cash received" value={receivedText} onChange={setReceivedText}/><p>Change: <strong>{ugx(change)}</strong></p></>:
       paymentMethod==="customer_credit"?<p>Available credit: {ugx(Number(selectedCustomer?.available_credit??0))}</p>:
       <div className="field"><label>Transaction reference</label><input value={reference} onChange={e=>setReference(e.target.value)} /></div>}
+      <div className="field"><label htmlFor="pos-approval-pin">Manager approval PIN (only when required)</label>
+        <input id="pos-approval-pin" type="password" autoComplete="off" value={approvalPin}
+          onChange={e=>setApprovalPin(e.target.value)} placeholder="Only if the discount requires approval"/>
+        <small>Never share this PIN in messages.</small></div>
       <button className="btn primary" disabled={busy||!openShift||!cart.length||!live||!canPost} onClick={()=>submit(false)} style={{width:"100%",marginTop:9}}>{busy?"Saving…":"Complete and Save Sale"}</button>
       </section>
     </div>
