@@ -80,7 +80,7 @@ export default function ExpenseManager({
         <div className="field"><label>Description</label><input value={description} onChange={e=>setDescription(e.target.value)}/></div>
       </div>
       <div className="grid2">
-        <div className="field"><label>Amount</label><input type="number" min="0.01" value={amount} onChange={e=>setAmount(Number(e.target.value))}/></div>
+        <div className="field"><label>Amount</label><input type="number" min="0.01" value={amount===0?"":amount} onChange={e=>setAmount(Number(e.target.value))}/></div>
         <div className="field"><label>Payment method</label><select value={method} onChange={e=>setMethod(e.target.value)}><option value="cash">Cash</option><option value="mtn_momo">MTN MoMo</option><option value="airtel_money">Airtel Money</option><option value="bank">Bank</option></select></div>
       </div>
       {method!=="cash"
