@@ -33,7 +33,7 @@ BEGIN
      IF NOT public.is_active_staff() OR public.is_active_viewer() THEN
        RAISE EXCEPTION 'Operational staff role denied: %',v_role; END IF;
      IF (SELECT count(*) FROM public.ds_sync_revision WHERE module='finance')
-       <>CASE WHEN v_role IN ('owner','manager') THEN 1 ELSE 0 END
+       <> (CASE WHEN v_role IN ('owner','manager') THEN 1 ELSE 0 END)
      THEN RAISE EXCEPTION 'Finance revision leakage for %',v_role; END IF;
    END IF;
    IF v_role<>'owner' THEN
