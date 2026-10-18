@@ -33,7 +33,9 @@ WITH b AS (INSERT INTO public.finished_goods_batches(batch_no,production_run_id,
 -- Cashier A creates independent shift and posts exactly one sale.
 SELECT set_config('request.jwt.claim.sub',current_setting('qa.cashier_a'),true);
 SET LOCAL ROLE authenticated;
-SELECT set_config('qa.shift_a',public.start_cashier_shift(20000)::text,true);
+SELECT set_config('qa.shift_a',COALESCE(
+ (SELECT cs.id::text FROM public.cashier_shifts cs WHERE cs.cashier_id=auth.uid() AND cs.status='open' ORDER BY cs.opened_at DESC LIMIT 1),
+ public.start_cashier_shift(20000)::text),true);
 SELECT set_config('qa.sale_a',public.complete_sale_v038(jsonb_build_array(jsonb_build_object('product_id',current_setting('qa.product'),'quantity',1)),0,NULL,
   '[{"method":"cash","amount":5000}]'::jsonb,'STAGING QA - cashier A',false,gen_random_uuid(),NULL,NULL)::text,true);
 RESET ROLE;
@@ -41,7 +43,9 @@ RESET ROLE;
 -- Cashier B is a different authenticated identity; separate shift and sale.
 SELECT set_config('request.jwt.claim.sub',current_setting('qa.cashier_b'),true);
 SET LOCAL ROLE authenticated;
-SELECT set_config('qa.shift_b',public.start_cashier_shift(15000)::text,true);
+SELECT set_config('qa.shift_b',COALESCE(
+ (SELECT cs.id::text FROM public.cashier_shifts cs WHERE cs.cashier_id=auth.uid() AND cs.status='open' ORDER BY cs.opened_at DESC LIMIT 1),
+ public.start_cashier_shift(15000)::text),true);
 SELECT set_config('qa.sale_b',public.complete_sale_v038(jsonb_build_array(jsonb_build_object('product_id',current_setting('qa.product'),'quantity',1)),0,NULL,
   '[{"method":"cash","amount":5000}]'::jsonb,'STAGING QA - cashier B',false,gen_random_uuid(),NULL,NULL)::text,true);
 RESET ROLE;
